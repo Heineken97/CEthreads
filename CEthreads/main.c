@@ -67,5 +67,11 @@ int main() {
     printf("\n=== Ejecutando Shortest Job First ===\n");
     sjf_scheduler(ships, ship_count);
 
+    printf("\n=== Ejecutando First-Come-First-Served (FCFS) ===\n");
+    fcfs_scheduler(ships, ship_count);
+
+    printf("\n=== Ejecutando Real-Time Scheduler (RTS) ===\n");
+    real_time_scheduler(ships, ship_count);
+
     return 0;
 }
