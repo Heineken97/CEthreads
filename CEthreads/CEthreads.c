@@ -1,99 +1,242 @@
-#include "CEthreads.h"
-#include <stdio.h>
+#include <malloc.h>
+#include <string.h>
 #include <stdlib.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/wait.h>
 #include <signal.h>
+#include <errno.h>
+#include "futex.h"
+#include "CEthreads.h"
+#include "CEthreads_q.h"
+#include <sys/syscall.h>
+#include <sys/types.h>
+#include <linux/sched.h>
 
-static CEthread threads[MAX_THREADS];
-static int thread_count = 0;
-CEthread *current_thread; // Inicializa el hilo actual
+/*Codigo para solucionar error con sigset_t*/
+/*Inicia aqui*/
+/*Termina aqui*/
 
-static void thread_wrapper(int id) {
-    current_thread = &threads[id]; // Establecer el hilo actual
-    threads[id].state = THREAD_RUNNING;
-    threads[id].func(threads[id].arg);
-    threads[id].state = THREAD_TERMINATED;
-    CEthread_end();
+/*---------------------------------------------------------CE_thread_create()---------------------------------------------------------------------------------*/
+
+#define CLONE_SIGNAL            (CLONE_SIGHAND | CLONE_THREAD)
+int CEthread_wrapper(void *);
+void *CEthread_idle(void *);
+
+/*El puntero externo global definido en CEthread.h apunta a la cabeza del nodo que
+esta en cola en el tcb (Thread Control Blocks)*/
+CEthread_private_t *CEthread_q_head;
+
+/*El puntero global el cual apunta al tcb del hilo principal*/
+CEthread_private_t *main_tcb;
+
+/*Esta estructura es utilizada para poder hacer referencia al hilo inactivo tcb*/
+CEthread_t idle_u_tcb;
+
+/*  Futex global el cual usamos cuando la operacion necesita ser realizada la cual a su vez es 
+    invocada por la llamada de rendimiento. 
+    El futex global es necesario para evitar las condiciones de carrera que puedan ser 
+    invocadas por múltiples subprocesos durante el rendimiento.
+*/
+extern struct futex gfutex;
+
+/* Cuando la primera llamada a CEthread_create es invocada creamos el tcb correspondiente
+   al hilo principal y los inactivos. La siguiente funcion agrega el tcb para el hilo principal
+   delante de la cola.
+*/
+static int __CEthread_add_main_tcb()
+{
+	DEBUG_PRINTF("add_main_tcb: Creating node for Main thread \n");
+	main_tcb = (CEthread_private_t *) malloc(sizeof(CEthread_private_t));
+	if (main_tcb == NULL) {
+		ERROR_PRINTF("add_main_tcb: Error allocating memory for main node\n");
+		return -ENOMEM;
+	}
+
+	main_tcb->start_func = NULL;
+	main_tcb->args = NULL;
+	main_tcb->state = READY;
+	main_tcb->returnValue = NULL;
+	main_tcb->blockedForJoin = NULL;
+
+	/*Obtiene el identificador de hilo tid y lo pone en su tcb correspondiente.*/
+	main_tcb->tid = __CEthread_gettid();
+
+	/*Inicializa el futex en cero*/
+	futex_init(&main_tcb->sched_futex, 1);
+
+	/*Lo pone en la cola de bloques de hilos*/
+	CEthread_q_add(main_tcb);
+	return 0;
 }
 
-int CEthread_create(CEthread *t, void (*func)(void *), void *arg) {
-    if (thread_count >= MAX_THREADS) {
-        return -1; // Límite de hilos alcanzado
-    }
+/* CEthread_create.
+   Esto crea un contexto de proceso compartido mediante la llamada al sistema de clonación.
+   Pasamos el puntero a una función contenedora (CEthread_wrapper.c) que a su vez 
+   configura el entorno del hilo y luego llama a la función del hilo.
+   El argumento CEthread_attr_t puede especificar opcionalmente el tamaño de la pila que se utilizará.
+   el hilo recién creado.
+ */
+int CEthread_create(CEthread_t * new_thread_ID,
+		    CEthread_attr_t * attr,
+		    void *(*start_func) (void *), void *arg)
+{
 
-    t->id = thread_count;
-    t->state = THREAD_NEW;
-    t->priority = 1; // Establecer una prioridad por defecto
-    t->func = func;
-    t->arg = arg;
-    t->parent = NULL;
-    t->child_count = 0;
+	/*Puntero a la pila utilizada por el proceso hijo que se creará mediante clonación más adelante*/
+	char *child_stack;
 
-    // Crear un nuevo proceso (hilo)
-    pid_t pid = fork();
-    if (pid < 0) {
-        return -1; // Error al crear el hilo
-    } else if (pid == 0) {
-        thread_wrapper(t->id); // Ejecutar la función del hilo
-        exit(0); // Terminar el hilo
-    }
+	unsigned long stackSize;
+	CEthread_private_t *new_node;
+	pid_t tid;
+	int retval;
 
-    threads[thread_count++] = *t; // Agregar el hilo a la tabla
-    t->state = THREAD_READY;
-    return 0; // Éxito
+	/*Banderas que se pasarán a la llamada al sistema de clonación*/
+	int clone_flags = (CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGNAL
+			   | CLONE_PARENT_SETTID
+			   | CLONE_CHILD_CLEARTID | CLONE_SYSVSEM);
+    
+	if (CEthread_q_head == NULL) {
+		/*Primera llamada CEthread_create. Configura Q primero con nodos tcb para el hilo principal.*/
+		retval = __CEthread_add_main_tcb();
+		if (retval != 0)
+			return retval;
+
+		/*Inicializa el futex global*/
+		futex_init(&gfutex, 1);
+
+		/*Crea el nodo para el subproceso inactivo con una llamada recursiva a CEthread_create().*/
+		DEBUG_PRINTF("create: creating node for Idle thread \n");
+		CEthread_create(&idle_u_tcb, NULL, CEthread_idle, NULL);
+	}
+
+	new_node = (CEthread_private_t *) malloc(sizeof(CEthread_private_t));
+	if (new_node == NULL) {
+		ERROR_PRINTF("Cannot allocate memory for node\n");
+		return -ENOMEM;
+	}
+
+	/* Si no se proporciona el argumento de tamaño de pila, utiliza SIGSTKSZ(sysconf) como tamaño de pila predeterminado. 
+       De lo contrario, extrae el argumento del tamaño de pila.
+	 */
+	if (attr == NULL)
+		stackSize = sysconf;
+	else
+		stackSize = attr->stackSize;
+
+	/*posix_memalign alinea la memoria asignada en un límite de 64 bits.*/
+	if (posix_memalign((void **)&child_stack, 8, stackSize)) {
+		ERROR_PRINTF("posix_memalign failed! \n");
+		return -ENOMEM;
+	}
+
+	/*Dejamos espacio para una invocación en la base de la pila.*/
+	child_stack = child_stack + stackSize - sizeof(void*);
+
+	/*Guarde el puntero thread_fun y el puntero a los argumentos en el tcb.*/
+	new_node->start_func = start_func;
+	new_node->args = arg;
+	/*Establece el estado como LISTO - LISTO en Q, esperando ser programado.*/
+	new_node->state = READY;
+
+	new_node->returnValue = NULL;
+	new_node->blockedForJoin = NULL;
+	/*Inicializa el sched_futex del tcb a cero */
+	futex_init(&new_node->sched_futex, 0);
+
+	/*Pone en la Q de los bloques de hilo.*/
+    CEthread_q_add(new_node);
+
+	/*Llamada al clon con puntero a la función contenedora. tcb se pasará como argumento a la función contenedora*/
+	if ((tid =
+	     clone(CEthread_wrapper, (char *)child_stack, clone_flags,
+		   new_node)) == -1) {
+		printf("clone failed! \n");
+		printf("ERROR: %s \n", strerror(errno));
+		return (-errno);
+	}
+	/*Guarda el tid devuelto por la llamada del sistema clone en el tcb.*/
+	new_thread_ID->tid = tid;
+	new_node->tid = tid;
+
+	DEBUG_PRINTF("create: Finished initialising new thread: %ld\n",
+		     (unsigned long)new_thread_ID->tid);
+	return 0;
 }
 
-void CEthread_end(void) {
-    exit(0);
+/*---------------------------------------------------------CE_thread_join()----------------------------------------------------------------------------------*/
+
+/* Espera en el hilo especificado por "target_thread". Si el hilo está DEFUNCT,
+   simplemente recopile el estado de la devolución. De lo contrario, espere a que el hilo muera y luego
+   recoga el estado de la devolución.
+ */
+int CEthread_join(CEthread_t target_thread, void **status)
+{
+	CEthread_private_t *target, *self_ptr;
+
+	self_ptr = __CEthread_selfptr();
+	DEBUG_PRINTF("Join: Got tid: %ld\n", (unsigned long)self_ptr->tid);
+	target = CEthread_q_search(target_thread.tid);
+
+	/* Si el hilo ya está muerto, no es necesario esperar. Solo recoge el valor de 
+	   devolucion y sale.
+	 */
+	if (target->state == DEFUNCT) {
+		*status = target->returnValue;
+		return 0;
+	}
+
+	DEBUG_PRINTF("Join: Checking for blocked for join\n");
+	/* Si el hilo no está muerto y alguien más ya lo está esperando
+	   devuelve un error
+	 */
+	if (target->blockedForJoin != NULL)
+		return -1;
+
+	/* Nos ponemos en espara para unirnos a este hilo. Establece nuestro estado como
+	   BLOCKED para que no nos vuelvan a programar.
+	 */
+	target->blockedForJoin = self_ptr;
+	DEBUG_PRINTF("Join: Setting state of %ld to %d\n",
+		     (unsigned long)self_ptr->tid, BLOCKED);
+	self_ptr->state = BLOCKED;
+
+	/*Programa otro hilo*/
+	CEthread_yield();
+
+	/* El hilo objetivo murió, colleciona el valor de retorno y regresa */
+	*status = target->returnValue;
+	return 0;
+}
+/*---------------------------------------------------------CE_thread_exit()----------------------------------------------------------------------------------*/
+
+/* Al llamar a exit() de glibc se sale del proceso. 
+   Llame directamente al syscall en vez de eso
+ */
+static void __CEthread_do_exit()
+{
+	syscall(SYS_exit, 0);
 }
 
-int CEthread_join(CEthread *t) {
-    return wait(NULL); // Esperar a que termine el proceso hijo
-}
+/* Ver si alguien nos está bloqueando para unirnos. Si es así, marque ese hilo como READY
+   y nos terminamos.
+ */
+void CEthread_exit(void *return_val)
+{
+	CEthread_private_t *self_ptr;
 
-int CEmutex_init(CEmutex *m) {
-    m->locked = 0; // Inicializar el mutex como desbloqueado
-    m->owner = NULL; // Sin propietario
-    m->waiter_count = 0; // Inicializar contadores de espera
-    return 0;
-}
+	/*Obtenga un puntero a nuestra estructura TCB*/
+	self_ptr = __CEthread_selfptr();
 
-int CEmutex_destroy(CEmutex *m) {
-    // Eliminar el mutex (implementación pendiente)
-    return 0;
-}
+    /*No elimine el nodo de la lista todavía. Tenemos que agarrar el valor devuelto */
+	self_ptr->state = DEFUNCT;
+	self_ptr->returnValue = return_val;
 
-int CEmutex_lock(CEmutex *m) {
-    while (__sync_lock_test_and_set(&m->locked, 1)) {
-        // Bloquear el hilo y agregarlo a la lista de espera
-        if (m->waiter_count < MAX_WAITERS) {
-            m->waiters[m->waiter_count++] = current_thread; // Obtener el hilo actual
-            current_thread->state = THREAD_BLOCKED; // Cambiar el estado del hilo actual a bloqueado
-        }
-        pause(); // Pone el hilo en un estado de espera
-    }
-    // Guardar el hilo propietario
-    m->owner = current_thread; // Obtener el hilo actual
-    return 0; // Éxito
-}
+	/* Cambia el estado de cualquier hilo que nos esté esperando. El despachador FIFO hará lo 
+	   necesario
+	 */
+	if (self_ptr->blockedForJoin != NULL)
+		self_ptr->blockedForJoin->state = READY;
 
-int CEmutex_unlock(CEmutex *m) {
-    if (!m->locked || m->owner != current_thread) {
-        return -1; // No se puede desbloquear
-    }
-    m->locked = 0; // Desbloquear
-    m->owner = NULL; // Liberar el propietario
+	__CEthread_dispatcher(self_ptr);
 
-    // Desbloquear el siguiente hilo en espera, si lo hay
-    if (m->waiter_count > 0) {
-        CEthread *next_thread = m->waiters[0];
-        for (int i = 0; i < m->waiter_count - 1; i++) {
-            m->waiters[i] = m->waiters[i + 1]; // Mover la lista
-        }
-        m->waiter_count--; // Reducir el contador
-        next_thread->state = THREAD_READY; // Cambiar el estado del hilo a listo
-    }
-    return 0; // Éxito
+	/* Termina el hilo */
+	__CEthread_do_exit();
+
 }
