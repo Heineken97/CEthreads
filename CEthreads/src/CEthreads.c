@@ -3,9 +3,9 @@
 #include <stdlib.h>
 #include <signal.h>
 #include <errno.h>
-#include "futex.h"
-#include "CEthreads.h"
-#include "CEthreads_q.h"
+#include "../include/futex.h"
+#include "../include/CEthreads.h"
+#include "../include/CEthreads_q.h"
 #include <sys/syscall.h>
 #include <sys/types.h>
 #include <linux/sched.h>
@@ -239,4 +239,86 @@ void CEthread_exit(void *return_val)
 	/* Termina el hilo */
 	__CEthread_do_exit();
 
+}
+/*---------------------------------------------------------------CEmutex_init()------------------------------------------------------------------------*/
+
+/*
+ * CEmutex_init - Inicializa un mutex, preparando su futex interno y 
+ * configurando las variables para indicar que no está bloqueado.
+ *
+ * @param mutex: Puntero al mutex que se va a inicializar.
+ *
+ * return: Siempre retorna 0, indicando que la operación fue exitosa.
+ */
+int CEmutex_init(CEmutex_t *mutex) {
+	if (mutex->locked) {
+        	// El mutex ya ha sido inicializado
+        	return -1;
+	}
+	// El mutex comienza sin estar bloqueado.
+	mutex->locked = 0;
+	// No hay ningún hilo que sea el dueño del mutex al inicio.
+	mutex->owner = NULL;
+	// No hay hilos en la lista de espera al inicio.
+	 mutex->waiters = NULL;
+	// Inicializa el futex asociado al mutex con un valor inicial de 0.
+	futex_init(&mutex->mutex_futex, 0);
+    return 0;
+}
+/*---------------------------------------------------------------CEmutex_destroy()------------------------------------------------------------------------*/
+
+/*
+ * CEmutex_destroy - Destruye un mutex.
+ *
+ * Dado que no se asignan recursos dinámicos durante la vida útil del mutex,
+ * no es necesario realizar ninguna acción específica en esta función.
+ *
+ * @param mutex: Puntero al mutex que se va a destruir.
+ *
+ * return: Siempre retorna 0, indicando que la operación fue exitosa.
+ */
+int CEmutex_destroy(CEmutex_t *mutex) {
+	if (mutex->locked) {
+        	// El mutex está bloqueado, no se puede destruir
+        	return -1;
+	}
+	free(mutex);
+	return 0;
+}
+
+/*---------------------------------------------------------------CEmutex_unlock()------------------------------------------------------------------------*/
+
+/*
+ * CEmutex_unlock - Libera el mutex, permitiendo que otros hilos lo adquieran.
+ *
+ * Si el hilo actual es el propietario del mutex, lo libera y despierta al primer hilo
+ * en la lista de espera, si existe alguno.
+ *
+ * @param mutex: Puntero al mutex que se va a liberar.
+ *
+ * return: 0 si se libera el mutex exitosamente, -1 si el hilo que llama
+ * a esta función no es el propietario del mutex.
+ */
+int CEmutex_unlock(CEmutex_t *mutex) {
+	// Obtiene un puntero al TCB (Thread Control Block) del hilo actual.
+	CEthread_private_t *self = __CEthread_selfptr();
+	// Si el hilo actual no es el propietario del mutex, devuelve un error.
+	if (mutex->owner != self) {
+		// El hilo actual no es el dueño del mutex.
+		return -1;
+	}
+	// Marca el mutex como desbloqueado.
+	mutex->locked = 0;
+	// El hilo actual ya no es el dueño del mutex.
+	mutex->owner = NULL;
+	// Si hay hilos en espera, despierta al primero de la lista.
+	if (mutex->waiters != NULL) {
+		// Obtiene el primer hilo de la lista de espera.
+		CEthread_private_t *waiter = mutex->waiters;
+       		// Actualiza la lista de espera, eliminando el primer hilo.
+        	mutex->waiters = waiter->next;
+		// Libera el futex para permitir que el hilo despertado continúe.
+		futex_up(&mutex->mutex_futex);
+	}
+	return 0;
 }

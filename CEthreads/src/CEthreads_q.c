@@ -1,4 +1,4 @@
-#include "CEthreads.h"
+#include "../include/CEthreads.h"
 
 /*El puntero externo global definido en CEthread.h apunta a la cabeza del nodo que
 esta en cola en el tcb (Thread Control Blocks)*/
@@ -89,4 +89,9 @@ CEthread_private_t *CEthread_q_search(unsigned long new_tid)
 	}
 	return NULL;
 
+}
+// Función para agregar un hilo a la lista de esperadores de un mutex
+void CEthread_q_add_waiter(CEthread_private_t *thread, CEthread_private_t **waiters) {
+	thread->next = *waiters;
+	*waiters = thread;
 }

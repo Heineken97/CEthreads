@@ -29,7 +29,9 @@ int main(int argc, char **argv) {
 */
 #include <stdio.h>
 #include <stdlib.h>
-#include "CEthreads.h"  // Include your custom CEthread header
+#include "../include/CEthreads.h"  // Include your custom CEthread header
+
+CEmutex_t mutex;
 
 void *entry_point(void *value) {
     printf("Hello from the second thread :)\n");
@@ -47,11 +49,17 @@ int main(int argc, char **argv) {
 
     int num = 123;
 
+    CEmutex_init(&mutex);
+
     // Replace pthread_create with CEthread_create
     CEthread_create(&thread, NULL, entry_point, &num);
 
     // Replace pthread_join with CEthread_join
     CEthread_join(thread, NULL);
+
+    CEmutex_unlock(&mutex);
+
+    CEmutex_destroy(&mutex);
 
     return EXIT_SUCCESS;
 }
