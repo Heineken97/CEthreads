@@ -40,6 +40,14 @@ typedef struct CEthread_private {
 
 }CEthread_private_t;
 
+// Estructura para representar un mutex
+typedef struct CEmutex {
+    struct futex mutex_futex; /* Futex que implementa la exclusión mutua */
+    int locked;               /* Indicador de si el mutex está bloqueado (1) o no (0) */
+    CEthread_private_t *owner; /* Hilo que actualmente tiene el mutex */
+    CEthread_private_t *waiters; /* Lista de hilos que están esperando adquirir el mutex */
+} CEmutex_t;
+
 extern CEthread_private_t *CEthread_q_head; /* The pointer pointing to head node of the TCB queue */
 
 /*
@@ -76,6 +84,24 @@ int CEthread_join(CEthread_t target_thread, void **status);
  * from thread_func and dequeue itself from run Q before dispatching run->next
  */
 void CEhread_end(void *retval);
+
+/*
+ * CEmutex_init - inicializa el mutex.
+ * Configura el futex y marca el mutex como desbloqueado.
+ */
+int CEmutex_init(CEmutex_t *mutex);
+
+/*
+ * CEmutex_destroy - destruye el mutex.
+ * Libera los recursos asociados al mutex.
+ */
+int CEmutex_destroy(CEmutex_t *mutex);
+
+/*
+ * CEmutex_unlock - desbloquea el mutex.
+ * Libera el mutex y despierta a cualquier hilo que esté esperando adquirirlo.
+ */
+int CEmutex_unlock(CEmutex_t *mutex);
 
 /* Private functions */
 
