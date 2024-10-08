@@ -20,7 +20,6 @@ typedef struct {
     double speed;           // Speed of the ship
     int priority;           // Priority level (for scheduling algorithms)
     int position;           // Position in channel
-
 } Ship;
 
 // Function to create a new ship

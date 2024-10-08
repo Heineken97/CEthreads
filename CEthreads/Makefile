@@ -11,9 +11,10 @@ BIN_DIR = bin
 # Target executable
 TARGET = $(BIN_DIR)/scheduling_ships
 
-# Source files
+# Source files (asegúrate de incluir schedulers.c y flow_methods.c aquí)
 SRCS = $(SRC_DIR)/main.c $(SRC_DIR)/CEthreads.c \
-       $(SRC_DIR)/ship.c
+       $(SRC_DIR)/ship.c $(SRC_DIR)/flow_methods.c \
+       $(SRC_DIR)/schedulers.c
 
 # Object files (replace .c with .o and store in OBJ_DIR)
 OBJS = $(SRCS:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
@@ -32,9 +33,9 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
 clean:
 	rm -rf $(OBJ_DIR) $(BIN_DIR)
 
-# Run the project
+# Run the project with an argument (default scheduler type is round_robin)
 run: $(TARGET)
-	./$(TARGET)
+	./$(TARGET) $(SCHEDULER_TYPE)
 
 # Rule to build with optional hardware support
 hardware: CFLAGS += -DHARDWARE_SUPPORT
