@@ -1,5 +1,4 @@
 /*
- *
  * Instituto Tecnologico de Costa Rica
  * Escuela de Ingenieria en Computadores
  * Principios de Sistemas Operativos
@@ -7,7 +6,6 @@
  * 
  * File: main.c
  * Archivo principal del programa
- *
  */
 
 #include <stdio.h>
@@ -20,40 +18,60 @@
 #include "schedulers.h"
 #include "flow_methods.h"
 
+
+/* Program variable to start/stop execution */
+int is_executing = 0;
+
+/* Scheduler to be used in program */
+SchedulerType SCHEDULER;
+
+/* Ships count */
+int ship_count = 0;
+
+
 /* ----------------------------- Configuration file variables ----------------------------- */
 
 /* Metodo de control de flujo */
-FlowMethod FLOW_METHOD;  // Define el método de flujo
+FlowMethod FLOW_METHOD;
 
-/* Canal parameters   */
-int CANAL_LENGTH = 1;  // Length of canal
+/* Length of canal */
+int CANAL_LENGTH = 1;
 
 /* Ship speeds */
 int NORMAL_SPEED = 1;
 int FISHING_SPEED = 2;
 int PATROL_SPEED = 3;
 
-/* Ships */
-// Linked list of ships (?)
+/* Maximum ship quantity */
 #define MAX_SHIPS 100
-Ship ships[MAX_SHIPS];  // Array para almacenar los barcos
+/* Array of Ships */
+Ship ships[MAX_SHIPS];
 
-// Tiempo del cambio de letrero
+/* Time in which the sign changes */
 float SIGN_CHANGE_TIME = 0.0;
 
-// Parámetro W para el método de equidad
+/* W param for EQUITY flow method */
 int W_PARAM = 0;
 
 /* ---------------------------------------------------------------------------------------- */
 
-/* Scheduler to be used in program */
-SchedulerType SCHEDULER;
 
-/* Ships created count */
-int ship_count = 0;     // Contador de barcos
-
-
-// Función para leer el archivo de configuración y asignar las variables
+/*
+ * Function: load_configuration
+ * ----------------------------
+ * Reads the configuration file and assigns the corresponding values to global variables.
+ * Processes flow method, canal length, ship speeds, and a list of ships with types and
+ * directions.
+ * 
+ * Parameters:
+ * - filename: name of the configuration file to be read
+ * 
+ * Notes:
+ * - The function reads each line of the configuration file, skipping comments and blank lines.
+ * - Ships are created based on the configuration format (e.g., ship(NORMAL,0)).
+ * - If the ship count exceeds the maximum allowed (`MAX_SHIPS`), the function prints an error.
+ * - The function modifies global variables such as FLOW_METHOD, CANAL_LENGTH, and ships array.
+ */
 void load_configuration(const char* filename) {
     FILE *file = fopen(filename, "r");
     if (file == NULL) {
@@ -142,8 +160,167 @@ void load_configuration(const char* filename) {
 
 
 /*
- * Función para simular el movimiento de un barco en el canal
- * Actualiza la posición del barco y lo imprime
+ * Function: send_state
+ * --------------------
+ * Simulates sending the current program state (ship data) to an interface and hardware module.
+ * 
+ * Notes:
+ * - This function prints the current state of all ships in the system, including their ID, type,
+ *   and direction.
+ * - In future implementations, it will send actual data to a user interface and a hardware
+ *   module.
+ */
+void send_state() {
+    printf("\nSimulating sending program state...\n");
+    printf("Lista de barcos:\n");
+    for (int i = 0; i < ship_count; i++) {
+        printf("  Barco %d: Tipo = %d, Dirección = %d\n", 
+               ships[i].id, ships[i].type, ships[i].direction);
+    }
+}
+
+
+/*
+ * Function: schedule
+ * ------------------
+ * Schedules the available ships using the selected scheduling algorithm.
+ * 
+ * Notes:
+ * - This function simulates the scheduling of ships based on the global variable `SCHEDULER`.
+ * - Depending on the scheduling algorithm selected (e.g., ROUND_ROBIN, PRIORITY), the
+ *   corresponding scheduler function is called.
+ * - If the scheduler type is unrecognized, an error is printed, and the program exits.
+ */
+void schedule() {
+
+    printf("\nSimulating scheduling ships...\n");
+
+    switch (SCHEDULER) {
+        case ROUND_ROBIN:
+            round_robin_scheduler(ships, ship_count, 4);  // Ejemplo con time quantum de 4
+            break;
+        case PRIORITY:
+            priority_scheduler(ships, ship_count);
+            break;
+        case SJF:
+            sjf_scheduler(ships, ship_count);
+            break;
+        case FCFS:
+            fcfs_scheduler(ships, ship_count);
+            break;
+        case REAL_TIME:
+            real_time_scheduler(ships, ship_count);
+            break;
+        default:
+            printf("Scheduler no reconocido.\n");
+            exit(EXIT_FAILURE);
+    }
+}
+
+
+/*
+ * Function: flow
+ * --------------
+ * Simulates the flow control method for managing the ships in the canal.
+ * 
+ * Notes:
+ * - The function chooses the flow control method based on the global variable `FLOW_METHOD`.
+ * - It calls the corresponding flow control function (e.g., equity_flow, sign_flow, tico_flow).
+ * - If no valid flow method is selected, it prints a message indicating that no flow method
+ *   was chosen.
+ */
+void flow() {
+    
+    printf("\nSimulating flow control method...\n");
+
+    switch (FLOW_METHOD) {
+        case EQUITY:
+            equity_flow(W_PARAM);  // Método de equidad
+            break;
+        case SIGN:
+            sign_flow(SIGN_CHANGE_TIME);  // Método de letrero con cambio
+            break;
+        case TICO:
+            tico_flow();  // Método Tico
+            break;
+        case NONE:
+        default:
+            printf("No flow method selected\n");
+    }
+}
+
+
+/*
+ * Function: manage_new_ships
+ * --------------------------
+ * Simulates the addition of new ships by creating a new ship with random attributes and adding
+ * it to the ships array.
+ * 
+ * Notes:
+ * - The new ship is assigned an ID, type, direction, and speed. The type and direction are
+ *   chosen randomly.
+ * - The speed is determined based on the ship's type (NORMAL, FISHING, PATROL).
+ * - The ship is added to the ships array, and the ship count is incremented.
+ * - The position and priority of the new ship are initialized to default values (0 and -1
+ *   respectively).
+ * - For now, this function simulates adding ships, but in the future, it will obtain input from
+ *   an interface (via key presses) to add new ships.
+ */
+void manage_new_ships() {
+    
+    printf("\nSimulating adding new ship...\n");
+    Ship new_ship;
+
+    // Asignar un ID
+    new_ship.id = ship_count + 1;
+
+    // Asignar un tipo de barco aleatorio
+    int random_type = rand() % 3;  // Valores entre 0 y 2
+    new_ship.type = (ShipType)random_type;
+
+    // Asignar una dirección aleatoria (0 o 1)
+    new_ship.direction = rand() % 2;
+
+    // Asignar la velocidad correspondiente al tipo de barco
+    switch (new_ship.type) {
+        case NORMAL:
+            new_ship.speed = NORMAL_SPEED;
+            break;
+        case FISHING:
+            new_ship.speed = FISHING_SPEED;
+            break;
+        case PATROL:
+            new_ship.speed = PATROL_SPEED;
+            break;
+    }
+
+    // Inicializar la posición y prioridad con valores predeterminados
+    new_ship.position = 0;
+    new_ship.priority = -1;
+
+    // Agrega el nuevo Ship
+    ships[ship_count] = new_ship;
+
+    // Incrementa la cantidad de Ships
+    ship_count++;
+}
+
+
+/*
+ * Function: simulate_ship_movement
+ * --------------------------------
+ * Simulates the movement of a ship through the canal and updates its position along the way.
+ * 
+ * Parameters:
+ * - ship: pointer to the Ship struct representing the ship to be moved
+ * - canal_length: the length of the canal, which determines how far the ship will move
+ * 
+ * Notes:
+ * - The function initializes the ship's position to 0 (start of the canal).
+ * - The ship's position is updated iteratively as it moves through the canal, and its details
+ *   are printed after each movement.
+ * - Once the ship reaches the end of the canal, a message is printed indicating that the ship
+ *   has completed its journey.
  */
 void simulate_ship_movement(Ship* ship, int canal_length) {
     printf("Simulating ship movement for Ship ID = %d...\n", ship->id);
@@ -177,24 +354,15 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    // Asignar el argumento de la línea de comandos a SchedulerType
+    // Asigna el argumento de la línea de comandos a SchedulerType
     // Funcion se encuentra en schedulers.h
     SCHEDULER = get_scheduler_type(argv[1]);
-
     printf("\nParametro obtenido al correr el programa:\n");
     printf("Calendarizador: %d\n\n", SCHEDULER);
 
 
 
-    // leer el archivo de configuracion
-    // define:
-    //      metodo de control de flujo
-    //      largo de canal
-    //      velocidad de barcos
-    //      cantidad de barcos en cola
-    //      tiempo del cambio de letrero
-    //      parametro W
-    // Cargar la configuración desde el archivo
+    // Lee y carga la configuración desde el archivo
     load_configuration("config/canal_config.txt");
 
     // Se imprimen las variables leídas para verificar
@@ -214,52 +382,42 @@ int main(int argc, char *argv[]) {
     }
 
 
+    printf("\n\nSTARTING EXECUTION\n\n");
+    // Starts the execution
+    is_executing = 1;
 
+    
+    /* --------------------------------- Testing simulations --------------------------------- */
 
-    /*
-     * Flow control method simulation
-     */
-    printf("\nSimulating flow control method...\n");
-
-    switch (FLOW_METHOD) {
-        case EQUITY:
-            equity_flow(W_PARAM);  // Método de equidad
-            break;
-        case SIGN:
-            sign_flow(SIGN_CHANGE_TIME);  // Método de letrero con cambio
-            break;
-        case TICO:
-            tico_flow();  // Método Tico
-            break;
-        case NONE:
-        default:
-            printf("No flow method selected\n");
-    }
-
-
-
-
-    /*
-     * Simulando el movimiento de cada barco en el canal usando el array `ships[]`
-     */
+    // Simulando el movimiento de cada barco en el canal usando el array `ships[]`
     printf("\nSimulating ship movements through the canal...\n\n");
     for (int i = 0; i < ship_count; i++) {
         simulate_ship_movement(&ships[i], CANAL_LENGTH);  // Simular el movimiento del barco
     }
-
     // No es necesario liberar memoria manualmente ya que los barcos están almacenados en un array estático
+    
+    /* --------------------------------------------------------------------------------------- */
+
+    /* main program cycle */
+    while (is_executing) {
+
+        /* Send actual state of program*/
+        send_state();
+
+        /* Schedule ships */
+        schedule();
+
+        /* Make ships flow */
+        flow();
+
+        /* Check if new ships have been added */
+        manage_new_ships();
+
+        // Solo para testing y que termine el programa mientras
+        if (ship_count > 9)
+            is_executing = !is_executing;
+
+    }
+
     return 0;
 }
-
-
-
-
-/*
- * Function: function_name
- * ----------------------
- * what the function does
- * 
- * args: arg explanation
- * 
- * returns: what the function returns
- */

@@ -1,5 +1,11 @@
+/*
+ * File: schedulers.h
+ *
+ */
 #ifndef SCHEDULERS_H
 #define SCHEDULERS_H
+#include "ship.h"
+// #include "CEthreads.h"
 
 typedef enum {
     ROUND_ROBIN,     // Round Robin
@@ -10,9 +16,11 @@ typedef enum {
 } SchedulerType;
 
 // Funciones para los distintos algoritmos de calendarización
-void round_robin_scheduler(/*Ship ships[],*/ int ship_count, int time_quantum);
-void priority_scheduler(/*Ship ships[],*/ int ship_count);
-void sjf_scheduler(/*Ship ships[],*/ int ship_count);
+void round_robin_scheduler(Ship ships[], int ship_count, int time_quantum);
+void priority_scheduler(Ship ships[], int ship_count);
+void sjf_scheduler(Ship ships[], int ship_count);
+void fcfs_scheduler(Ship ships[], int ship_count);
+void real_time_scheduler(Ship ships[], int ship_count);
 
 // Función para convertir una cadena de caracteres a un tipo de calendarizador
 SchedulerType get_scheduler_type(const char* scheduler_name);

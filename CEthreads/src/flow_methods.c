@@ -1,3 +1,7 @@
+/*
+ * File: flow_methods.c
+ *
+ */
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -6,22 +10,33 @@
 // Simulación del método de flujo "Equidad"
 void equity_flow(int W) {
     printf("Método de flujo: Equidad. Permitimos que %d barcos pasen de cada lado.\n", W);
-    // Aquí agregarías la lógica para permitir que W barcos pasen antes de cambiar de lado.
 }
 
 // Simulación del método de flujo "Letrero"
 void sign_flow(int change_time) {
     printf("Método de flujo: Letrero. El letrero cambia cada %d segundos.\n", change_time);
-    // Aquí agregarías la lógica para cambiar el sentido del flujo basado en el tiempo.
 }
 
 // Simulación del método de flujo "Tico"
 void tico_flow() {
     printf("Método de flujo: Tico. No hay control de flujo explícito, pero evitamos colisiones.\n");
-    // Aquí agregarías la lógica que evita colisiones sin un control de flujo específico.
 }
 
-// Implementación de la función para convertir un string a FlowMethod
+/*
+ * Function: get_flow_method
+ * -------------------------
+ * Converts a string representing a flow control method into the corresponding FlowMethod enum.
+ * 
+ * Parameters:
+ * - method_name: string that represents the flow method (e.g., "EQUITY", "SIGN", "TICO")
+ * 
+ * Returns:
+ * - The corresponding FlowMethod enum value (EQUITY, SIGN, TICO).
+ * 
+ * Notes:
+ * - If the provided method_name is invalid, the function prints an error message and exits the program.
+ * - Ensure that the method_name matches one of the predefined flow method names ("EQUITY", "SIGN", "TICO").
+ */
 FlowMethod get_flow_method(const char* method_name) {
     if (strcmp(method_name, "EQUITY") == 0) {
         return EQUITY;

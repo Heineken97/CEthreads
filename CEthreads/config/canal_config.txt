@@ -27,8 +27,10 @@ ship(NORMAL,1)
 ship(FISHING,0)
 
 
-# Tiempo de cambio del letrero (en segundos, solo aplica si se usa el método de control "letrero")
+# Tiempo de cambio del letrero
+# (en segundos, solo aplica si se usa el método de control "SIGN")
 sign_change_time: 6.9
 
-# Parámetro W para el control de flujo de equidad (cantidad de barcos que cruzan antes de cambiar de dirección)
+# Parámetro W para el control de flujo de equidad
+# (cantidad de barcos que cruzan antes de cambiar de dirección)
 w_param: 7

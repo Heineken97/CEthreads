@@ -1,3 +1,7 @@
+/*
+ * File: schedulers.c
+ *
+ */
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -6,72 +10,62 @@
 #include "ship.h"
 
 // Round Robin Scheduler
-void round_robin_scheduler(/*Ship ships[],*/ int ship_count, int time_quantum) {
-    // int completed = 0;
-    // while (completed < ship_count) {
-    //     for (int i = 0; i < ship_count; i++) {
-    //         if (ships[i].thread.state != THREAD_TERMINATED) {
-    //             printf("Barco %d ejecutando por %d segundos en RR.\n", i, time_quantum);
-    //             sleep(time_quantum); // Simula el tiempo de ejecución
-    //             ships[i].position += 1;
-
-    //             if (ships[i].position >= CHANNEL_LENGTH) {
-    //                 ships[i].thread.state = THREAD_TERMINATED;
-    //                 printf("Barco %d ha finalizado en RR.\n", i);
-    //                 completed++;
-    //             }
-    //         }
-    //     }
-    // }
+void round_robin_scheduler(Ship ships[], int ship_count, int time_quantum) {
+    printf("Simulando calendarizador Round Robin con un time quantum de %d\n", time_quantum);
+    for (int i = 0; i < ship_count; i++) {
+        printf("Barco ID: %d, Procesado en Round Robin\n", ships[i].id);
+    }
 }
 
 // Priority Scheduler
-void priority_scheduler(/*Ship ships[],*/ int ship_count) {
-    // for (int i = 0; i < ship_count; i++) {
-    //     for (int j = i + 1; j < ship_count; j++) {
-    //         if (ships[i].thread.priority < ships[j].thread.priority) {
-    //             Ship temp = ships[i];
-    //             ships[i] = ships[j];
-    //             ships[j] = temp;
-    //         }
-    //     }
-    // }
-
-    // for (int i = 0; i < ship_count; i++) {
-    //     printf("Ejecutando barco %d con prioridad %d\n", i, ships[i].thread.priority);
-    //     while (ships[i].position < CHANNEL_LENGTH) {
-    //         printf("Barco %d avanzando en canal.\n", i);
-    //         sleep(1); // Simula el trabajo del hilo
-    //         ships[i].position += 1;
-    //     }
-    //     printf("Barco %d ha salido del canal (prioridad).\n", i);
-    // }
+void priority_scheduler(Ship ships[], int ship_count) {
+    printf("Simulando calendarizador de Prioridad\n");
+    for (int i = 0; i < ship_count; i++) {
+        printf("Barco ID: %d, Procesado según Prioridad\n", ships[i].id);
+    }
 }
 
 // Shortest Job First (SJF) Scheduler
-void sjf_scheduler(/*Ship ships[],*/ int ship_count) {
-    // for (int i = 0; i < ship_count; i++) {
-    //     for (int j = i + 1; j < ship_count; j++) {
-    //         if (ships[i].position > ships[j].position) {
-    //             Ship temp = ships[i];
-    //             ships[i] = ships[j];
-    //             ships[j] = temp;
-    //         }
-    //     }
-    // }
-
-    // for (int i = 0; i < ship_count; i++) {
-    //     printf("Ejecutando barco %d con trabajo estimado %d\n", i, ships[i].position);
-    //     while (ships[i].position < CHANNEL_LENGTH) {
-    //         printf("Barco %d avanzando en canal (SJF).\n", i);
-    //         sleep(1);
-    //         ships[i].position += 1;
-    //     }
-    //     printf("Barco %d ha salido del canal (SJF).\n", i);
-    // }
+void sjf_scheduler(Ship ships[], int ship_count) {
+    printf("Simulando calendarizador Shortest Job First\n");
+    for (int i = 0; i < ship_count; i++) {
+        printf("Barco ID: %d, Procesado en SJF\n", ships[i].id);
+    }
 }
 
-// Función para convertir una cadena de caracteres a un tipo de calendarizador
+// First-Come-First-Served (FCFS) Scheduler
+void fcfs_scheduler(Ship ships[], int ship_count) {
+    printf("Simulando calendarizador First-Come-First-Served\n");
+    for (int i = 0; i < ship_count; i++) {
+        printf("Barco ID: %d, Procesado en FCFS\n", ships[i].id);
+    }
+}
+
+// Real-Time Scheduler (RTS)
+void real_time_scheduler(Ship ships[], int ship_count) {
+    printf("Simulando calendarizador Real-Time Scheduler\n");
+    for (int i = 0; i < ship_count; i++) {
+        printf("Barco ID: %d, Procesado en RTS\n", ships[i].id);
+    }
+}
+
+/*
+ * Function: get_scheduler_type
+ * ----------------------------
+ * Converts a string representing a scheduling algorithm into the corresponding SchedulerType
+ * enum.
+ * 
+ * Parameters:
+ * - scheduler_name: string representing the name of the scheduling algorithm
+ *   (e.g., "round_robin", "priority", "sjf", "fcfs", "real_time")
+ * 
+ * Returns:
+ * - The corresponding SchedulerType enum value (e.g., ROUND_ROBIN, PRIORITY, SJF).
+ * 
+ * Notes:
+ * - If the provided scheduler_name does not match any valid scheduler type, the function prints
+ *   an error message and terminates the program.
+ */
 SchedulerType get_scheduler_type(const char* scheduler_name) {
     if (strcmp(scheduler_name, "round_robin") == 0) {
         return ROUND_ROBIN;
