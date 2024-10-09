@@ -8,44 +8,109 @@
 #include <unistd.h>
 #include "schedulers.h"
 #include "ship.h"
+#include "config.h"
 
 // Round Robin Scheduler
 void round_robin_scheduler(Ship ships[], int ship_count, int time_quantum) {
-    printf("Simulando calendarizador Round Robin con un time quantum de %d\n", time_quantum);
-    for (int i = 0; i < ship_count; i++) {
-        printf("Barco ID: %d, Procesado en Round Robin\n", ships[i].id);
+    int completed = 0;
+    while (completed < ship_count) {
+        for (int i = 0; i < ship_count; i++) {
+            if (ships[i].thread.state != THREAD_TERMINATED) {
+                printf("Barco %d ejecutando por %d segundos en RR.\n", i, time_quantum);
+                sleep(time_quantum); // Simula el tiempo de ejecución
+                ships[i].position += 1;
+
+                if (ships[i].position >= CANAL_LENGTH) {
+                    ships[i].thread.state = THREAD_TERMINATED;
+                    printf("Barco %d ha finalizado en RR.\n", i);
+                    completed++;
+                }
+            }
+        }
     }
 }
 
 // Priority Scheduler
 void priority_scheduler(Ship ships[], int ship_count) {
-    printf("Simulando calendarizador de Prioridad\n");
     for (int i = 0; i < ship_count; i++) {
-        printf("Barco ID: %d, Procesado según Prioridad\n", ships[i].id);
+        for (int j = i + 1; j < ship_count; j++) {
+            if (ships[i].thread.priority < ships[j].thread.priority) {
+                Ship temp = ships[i];
+                ships[i] = ships[j];
+                ships[j] = temp;
+            }
+        }
+    }
+
+    for (int i = 0; i < ship_count; i++) {
+        printf("Ejecutando barco %d con prioridad %d\n", i, ships[i].thread.priority);
+        while (ships[i].position < CANAL_LENGTH) {
+            printf("Barco %d avanzando en canal.\n", i);
+            sleep(1); // Simula el trabajo del hilo
+            ships[i].position += 1;
+        }
+        printf("Barco %d ha salido del canal (prioridad).\n", i);
     }
 }
 
 // Shortest Job First (SJF) Scheduler
 void sjf_scheduler(Ship ships[], int ship_count) {
-    printf("Simulando calendarizador Shortest Job First\n");
     for (int i = 0; i < ship_count; i++) {
-        printf("Barco ID: %d, Procesado en SJF\n", ships[i].id);
+        for (int j = i + 1; j < ship_count; j++) {
+            if (ships[i].position > ships[j].position) {
+                Ship temp = ships[i];
+                ships[i] = ships[j];
+                ships[j] = temp;
+            }
+        }
+    }
+
+    for (int i = 0; i < ship_count; i++) {
+        printf("Ejecutando barco %d con trabajo estimado %d\n", i, ships[i].position);
+        while (ships[i].position < CANAL_LENGTH) {
+            printf("Barco %d avanzando en canal (SJF).\n", i);
+            sleep(1);
+            ships[i].position += 1;
+        }
+        printf("Barco %d ha salido del canal (SJF).\n", i);
     }
 }
 
 // First-Come-First-Served (FCFS) Scheduler
 void fcfs_scheduler(Ship ships[], int ship_count) {
-    printf("Simulando calendarizador First-Come-First-Served\n");
     for (int i = 0; i < ship_count; i++) {
-        printf("Barco ID: %d, Procesado en FCFS\n", ships[i].id);
+        printf("Ejecutando barco %d en FCFS\n", i);
+        while (ships[i].position < CANAL_LENGTH) {
+            printf("Barco %d avanzando en canal (FCFS).\n", i);
+            sleep(1); // Simula el trabajo del hilo
+            ships[i].position += 1;
+        }
+        ships[i].thread.state = THREAD_TERMINATED; // Marcar el barco como terminado
+        printf("Barco %d ha salido del canal (FCFS).\n", i);
     }
 }
 
 // Real-Time Scheduler (RTS)
 void real_time_scheduler(Ship ships[], int ship_count) {
-    printf("Simulando calendarizador Real-Time Scheduler\n");
     for (int i = 0; i < ship_count; i++) {
-        printf("Barco ID: %d, Procesado en RTS\n", ships[i].id);
+        for (int j = i + 1; j < ship_count; j++) {
+            if (ships[i].position > ships[j].position) {
+                Ship temp = ships[i];
+                ships[i] = ships[j];
+                ships[j] = temp;
+            }
+        }
+    }
+
+    for (int i = 0; i < ship_count; i++) {
+        printf("Ejecutando barco %d en RTS\n", i);
+        while (ships[i].position < CANAL_LENGTH) {
+            printf("Barco %d avanzando en canal (RTS).\n", i);
+            sleep(1);
+            ships[i].position += 1;
+        }
+        ships[i].thread.state = THREAD_TERMINATED; // Marcar el barco como terminado
+        printf("Barco %d ha salido del canal (RTS).\n", i);
     }
 }
 

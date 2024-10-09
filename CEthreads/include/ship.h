@@ -5,6 +5,8 @@
 #ifndef SHIPS_H
 #define SHIPS_H
 
+#include "CEthreads.h"
+
 // Enumerate ship types
 typedef enum {
     NORMAL,
@@ -20,6 +22,7 @@ typedef struct {
     double speed;           // Speed of the ship
     int priority;           // Priority level (for scheduling algorithms)
     int position;           // Position in channel
+    CEthread thread; // Hilo asociado al barco
 } Ship;
 
 // Function to create a new ship
