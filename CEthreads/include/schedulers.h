@@ -5,7 +5,6 @@
 #ifndef SCHEDULERS_H
 #define SCHEDULERS_H
 #include "ship.h"
-// #include "CEthreads.h"
 
 typedef enum {
     ROUND_ROBIN,     // Round Robin

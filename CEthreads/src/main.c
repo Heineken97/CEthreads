@@ -23,7 +23,7 @@
 int is_executing = 0;
 
 /* Scheduler to be used in program */
-SchedulerType SCHEDULER;
+SchedulerType SCHEDULER = ROUND_ROBIN;
 
 /* Ships count */
 int ship_count = 0;

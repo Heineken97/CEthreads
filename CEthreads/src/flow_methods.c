@@ -7,12 +7,9 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include "flow_methods.h"
+#include "schedulers.h"
 #include "ship.h"
-#include "config.h"
-
-// Variables externas globales
-extern Ship ships[MAX_SHIPS];
-extern int ship_count;
+#include "main.c"
 
 // Función simulada que mueve un barco a través del canal
 extern void simulate_ship_movement(Ship* ship, int canal_length);
@@ -35,8 +32,8 @@ void equity_flow(int W) {
         // Permitir el paso de W barcos de izquierda a derecha
         int ships_in_current_round = 0;
         for (int i = 0; i < ship_count && ships_in_current_round < W; i++) {
-            if (ships[i].direction == 0 && ships[i].position == -1) {  // Barcos de izquierda a derecha
-                simulate_ship_movement(&ships[i], CANAL_LENGTH);
+            if (ships[i].direction == 0) {  // Barcos de izquierda a derecha (&& ships[i].position == -1)
+                schedule();
                 ships_in_current_round++;
                 passed_ships_left++;
             }
@@ -45,8 +42,8 @@ void equity_flow(int W) {
         // Permitir el paso de W barcos de derecha a izquierda
         ships_in_current_round = 0;
         for (int i = 0; i < ship_count && ships_in_current_round < W; i++) {
-            if (ships[i].direction == 1 && ships[i].position == -1) {  // Barcos de derecha a izquierda
-                simulate_ship_movement(&ships[i], CANAL_LENGTH);
+            if (ships[i].direction == 1) {  // Barcos de derecha a izquierda (&& ships[i].position == -1)
+                schedule();
                 ships_in_current_round++;
                 passed_ships_right++;
             }
@@ -75,7 +72,7 @@ void sign_flow(int change_time) {
         // Permitir paso de barcos en la dirección actual
         for (int i = 0; i < ship_count; i++) {
             if (ships[i].direction == current_direction && ships[i].position == -1) {
-                simulate_ship_movement(&ships[i], CANAL_LENGTH);
+                schedule();
                 passed_ships++;
                 total_passed++;
             }
@@ -109,7 +106,7 @@ void tico_flow() {
         // Priorizar barcos de izquierda a derecha si no hay conflicto
         for (int i = 0; i < ship_count && !passed_ship; i++) {
             if (ships[i].direction == 0 && ships[i].position == -1) {  // Izquierda a derecha
-                simulate_ship_movement(&ships[i], CANAL_LENGTH);
+                schedule();
                 left_count++;
                 passed_ship = 1;  // Indicar que un barco ha pasado
             }
@@ -118,7 +115,7 @@ void tico_flow() {
         // Si no hay barcos de izquierda, permitir barcos de derecha a izquierda
         for (int i = 0; i < ship_count && !passed_ship; i++) {
             if (ships[i].direction == 1 && ships[i].position == -1) {  // Derecha a izquierda
-                simulate_ship_movement(&ships[i], CANAL_LENGTH);
+                schedule();
                 right_count++;
                 passed_ship = 1;
             }

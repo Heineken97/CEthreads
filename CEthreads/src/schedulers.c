@@ -7,8 +7,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include "schedulers.h"
-#include "ship.h"
-#include "config.h"
+#include "main.c"
 
 // Round Robin Scheduler
 void round_robin_scheduler(Ship ships[], int ship_count, int time_quantum) {
