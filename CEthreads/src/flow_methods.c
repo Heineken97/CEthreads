@@ -9,7 +9,7 @@
 #include "flow_methods.h"
 #include "schedulers.h"
 #include "ship.h"
-#include "main.c"
+// #include "main.c"
 
 // Función simulada que mueve un barco a través del canal
 extern void simulate_ship_movement(Ship* ship, int canal_length);

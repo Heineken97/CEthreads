@@ -13,8 +13,8 @@ TARGET = $(BIN_DIR)/scheduling_ships
 
 # Source files (asegúrate de incluir schedulers.c y flow_methods.c aquí)
 SRCS = $(SRC_DIR)/main.c $(SRC_DIR)/CEthreads.c \
-       $(SRC_DIR)/ship.c $(SRC_DIR)/flow_methods.c \
-       $(SRC_DIR)/schedulers.c
+       $(SRC_DIR)/ship.c \
+       $(SRC_DIR)/schedulers.c $(SRC_DIR)/flow_manager.c
 
 # Object files (replace .c with .o and store in OBJ_DIR)
 OBJS = $(SRCS:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
