@@ -1,11 +1,9 @@
 //Interfaz de la libreria de hilos CEthreads
-
 #include <malloc.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "futex.h"
 #include <string.h>
-
 #ifndef CETHREAD_H
 #define CETHREAD_H
 
@@ -48,13 +46,6 @@ typedef struct CEmutex {
     CEthread_private_t *waiters; /* Lista de hilos que están esperando adquirir el mutex */
 } CEmutex_t;
 
-extern CEthread_private_t *CEthread_q_head; /* The pointer pointing to head node of the TCB queue */
-
-/*
- * CEthread_self - identificador del hilo que esta corriendo actualmente.
- */
-CEthread_t CEthread_self(void);
-
 /*
  * CEthread_create - prepares context of new_thread_ID as start_func(arg),
  * attr es ignorado por ahora.
@@ -65,6 +56,8 @@ int CEthread_create(CEthread_t *new_thread_ID,
 					CEthread_attr_t *attr,
 					void * (*start_func)(void *),
 					void *arg);
+
+CEthread_private_t *CEthread_q_head; /* The pointer pointing to head node of the TCB queue */
 
 /*
  * CEthread_yield - switch from running thread to the next ready one
@@ -109,15 +102,11 @@ int CEmutex_unlock(CEmutex_t *mutex);
 pid_t __CEthread_gettid();
 
 /* Get the pointer to the private structure of this thread */
-CEthread_private_t *__CEthread_selfptr();
+//CEthread_private_t *__CEthread_selfptr();
 
 /* Dispatcher - The thread scheduler */
 int __CEthread_dispatcher(CEthread_private_t *);
 void __CEthread_debug_futex_init();
-
-/* Debugging */
-extern char debug_msg[1000];
-extern struct futex debug_futex;
 
 #ifdef DEBUG
 #define DEBUG_PRINTF(...) __CEthread_debug_futex_init(); \

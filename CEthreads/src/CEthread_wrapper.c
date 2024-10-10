@@ -1,7 +1,7 @@
 
 #include <unistd.h>
-#include <CEthreads.h>
-#include <futex.h>
+#include "../include/CEthreads.h"
+#include "../include/futex.h"
 
 
 /* Se crea un nuevo hilo con este puntero contenedor. El objetivo es suspender el nuevo

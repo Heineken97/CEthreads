@@ -3,12 +3,10 @@
 #include <stdlib.h>
 #include <signal.h>
 #include <errno.h>
-#include "../include/futex.h"
-#include "../include/CEthreads.h"
-#include "../include/CEthreads_q.h"
 #include <sys/syscall.h>
 #include <sys/types.h>
 #include <linux/sched.h>
+#include "../include/CEthreads_q.h"
 
 /*Codigo para solucionar error con sigset_t*/
 /*Inicia aqui*/
@@ -19,10 +17,11 @@
 #define CLONE_SIGNAL            (CLONE_SIGHAND | CLONE_THREAD)
 int CEthread_wrapper(void *);
 void *CEthread_idle(void *);
+/* Debugging */
+char debug_msg[1000];
+struct futex debug_futex;
 
-/*El puntero externo global definido en CEthread.h apunta a la cabeza del nodo que
-esta en cola en el tcb (Thread Control Blocks)*/
-CEthread_private_t *CEthread_q_head;
+CEthread_private_t *__CEthread_selfptr();
 
 /*El puntero global el cual apunta al tcb del hilo principal*/
 CEthread_private_t *main_tcb;
@@ -35,7 +34,13 @@ CEthread_t idle_u_tcb;
     El futex global es necesario para evitar las condiciones de carrera que puedan ser 
     invocadas por múltiples subprocesos durante el rendimiento.
 */
-extern struct futex gfutex;
+struct futex gfutex;
+
+/*
+ * CEthread_self - identificador del hilo que esta corriendo actualmente.
+ */
+CEthread_t CEthread_self(void);
+
 
 /* Cuando la primera llamada a CEthread_create es invocada creamos el tcb correspondiente
    al hilo principal y los inactivos. La siguiente funcion agrega el tcb para el hilo principal
@@ -116,7 +121,7 @@ int CEthread_create(CEthread_t * new_thread_ID,
        De lo contrario, extrae el argumento del tamaño de pila.
 	 */
 	if (attr == NULL)
-		stackSize = sysconf;
+		stackSize = (unsigned long) sysconf(_SC_PAGESIZE);
 	else
 		stackSize = attr->stackSize;
 
@@ -321,4 +326,42 @@ int CEmutex_unlock(CEmutex_t *mutex) {
 		futex_up(&mutex->mutex_futex);
 	}
 	return 0;
+}
+// Implementación de __CEthread_gettid
+
+pid_t __CEthread_gettid() {
+	 return syscall(SYS_gettid);
+}
+// Implementación de __CEthread_dispatcher
+int __CEthread_dispatcher(CEthread_private_t *thread) {
+    futex_up(&thread->sched_futex);
+    return 0;
+}
+
+// Implementación de __CEthread_debug_futex_init
+void __CEthread_debug_futex_init() {
+    futex_init(&debug_futex, 0);
+}
+
+// Implementación de CEthread_yield
+int CEthread_yield(void) {
+    CEthread_private_t *self_ptr = __CEthread_selfptr();
+    CEthread_private_t *next_thread = self_ptr->next;
+    if (next_thread->state == READY) {
+        __CEthread_dispatcher(next_thread);
+    }
+    return 0;
+
+}
+CEthread_private_t *__CEthread_selfptr() {
+    return (CEthread_private_t *) syscall(SYS_get_thread_area);
+}
+// Implementación de CEthread_idle
+
+void *CEthread_idle(void *arg) {
+    while (1) {
+        // El hilo inactivo se queda en un bucle infinito
+    }
+    return NULL;
+
 }
