@@ -5,7 +5,7 @@
 
 # Método de control de flujo
 # Opciones: EQUITY, SIGN, TICO
-flow_method: SIGN
+flow_method: EQUITY
 
 # Largo del canal (en unidades arbitrarias)
 canal_length: 5
@@ -21,14 +21,15 @@ patrol_speed: 3
 # Tipo: NORMAL, FISHING, PATROL
 # Dirección: 0 (Izq -> Der), 1 (Der -> Izq)
 ship(NORMAL,0)
-ship(FISHING,1)
-ship(PATROL,0)
+ship(NORMAL,0)
+ship(NORMAL,0)
 ship(NORMAL,1)
-ship(FISHING,0)
+ship(NORMAL,1)
+ship(NORMAL,1)
 
 # Parámetro W para el control de flujo de equidad
 # (cantidad de barcos que cruzan antes de cambiar de dirección)
-w_param: 7
+w_param: 3
 
 # Tiempo de cambio del letrero
 # (en segundos, solo aplica si se usa el método de control "SIGN")

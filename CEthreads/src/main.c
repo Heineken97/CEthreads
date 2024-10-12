@@ -30,11 +30,14 @@ int canal_is_open = 0;
 /* Scheduler to be used in program */
 SchedulerType SCHEDULER;
 
-/* Ships count */
+/* Ships created */
 int ship_count = 0;
 
 /* Flow Manager */
 FlowManager flow_manager;
+
+// Crear el hilo para gestionar el canal
+pthread_t canal_thread;
 
 /* ---------------------------------------------------------------------------------------- */
 
@@ -94,6 +97,10 @@ void load_configuration(const char* filename) {
                 break;
             }
 
+            if (!flow_manager.ship_added) {
+                flow_manager.ship_added = 1;
+            }
+
             // Leer el tipo de barco y la dirección dentro de ship(...)
             char type_str[10];
             int direction = -1;
@@ -131,38 +138,48 @@ void load_configuration(const char* filename) {
                 // Obtiene la cantidad de barcos en la lista para saber su posicion
                 temp_pos = flow_manager.ships_in_queue_LR;
                 // Crea un nuevo Ship y se referencia con este puntero
-                new_ship = create_ship(temp_pos+1, type, direction, speed);
+                new_ship = create_ship(ship_count+1, type, direction, speed);
                 // Almacena el Ship en el array correspondiente asignando el valor al que apunta new_ship
                 flow_manager.queue_LR[temp_pos] = *new_ship;
                 // Aumenta la cantidad en la lista al haberlo agregado
                 flow_manager.ships_in_queue_LR++;
                 // Prints total ships in queue_LR
-                printf("Ships in queue_LR = %d\n", flow_manager.ships_in_queue_LR);
             }
             else if (direction == 1) {
                 // Obtiene la cantidad de barcos en la lista para saber su posicion
                 temp_pos = flow_manager.ships_in_queue_RL;
                 // Crea un nuevo Ship y se referencia con este puntero
-                new_ship = create_ship(temp_pos+1, type, direction, speed);
+                new_ship = create_ship(ship_count+1, type, direction, speed);
                 // Almacena el Ship en el array correspondiente asignando el valor al que apunta new_ship
                 flow_manager.queue_RL[temp_pos] = *new_ship;
                 // Aumenta la cantidad en la lista al haberlo agregado
                 flow_manager.ships_in_queue_RL++;
-                // Prints total ships in queue_RL
-                printf("Ships in queue_RL = %d\n", flow_manager.ships_in_queue_RL);
+                // Prints total ships in queue_RL  
             }
 
             ship_count++;  // Incrementar el contador total de barcos
         }
     }
+    printf("Ships in queue_LR = %d\n", flow_manager.ships_in_queue_LR);
+    printf("Ships in queue_RL = %d\n", flow_manager.ships_in_queue_RL);
 
     fclose(file);
 }
 
 /*
- * Alsita el canal
+ * Alista el canal
  */
 void ready_up_canal(){
+
+    printf("\nInitializaing variables on flow_manager for canal...\n");
+
+    // Inicialmente la primera direccion será de Izq a Der
+    flow_manager.current_direction = 0;
+    // Se inicializa la variable en 0
+    flow_manager.ships_passed_this_cycle = 0;
+    // Se inicializa la variable en 0
+    flow_manager.total_ships_passed = 0;
+
 
     printf("\nInitializaing mutexes on canal spaces...\n");
 
@@ -172,11 +189,26 @@ void ready_up_canal(){
         flow_manager.space_state[i] = 0;  // Espacios libres al inicio
     }
 
+    printf("\nInitializaing variables on flow_manager for flow methods...\n");
+
+    // Inicializar el array para saber los ids que van al canal en EQUITY
+    // Ningun barco tendrá id 0 
+    for (int i = 0; i < MAX_SHIPS; i++) {
+        flow_manager.ids_for_canal[i] = 0;  // Ids en 0 al inicio
+    }
+
+    // Se inicializa la variable en 0 ya que no están listos
+    flow_manager.ships_for_cycle_ready = 0;
+
+
+    // Crea hilo para el flow_manager
+    pthread_create(&canal_thread, NULL, manage_canal, &flow_manager);
+
+
     printf("\nOpening canal...\n");
     // Ships are now allowed to flow
     canal_is_open = 1;
-    printf("\nShips are now allowed to flow...\n");
-
+    printf("\nShips are now allowed to flow...\n\n");
 }
 
 
@@ -190,25 +222,45 @@ void ready_up_canal(){
  * - ships_queue: array of ships (either queue_LR or queue_RL)
  * - num_ships: number of ships in the queue
  */
-void ready_up_ships(FlowManager* flow_manager, Ship ships_queue[], int num_ships) {
+void ready_up_ships() {
     // Estructura de contexto para pasar el barco y el flow_manager a cada hilo
     struct {
         Ship* ship;
         FlowManager* flow_manager;
     } contexts[MAX_SHIPS];  // Usar un array de estructuras para cada barco
 
-    // Crear hilos para cada barco en la cola
-    for (int i = 0; i < num_ships; i++) {
-        contexts[i].ship = &ships_queue[i];       // Asignar el barco
-        contexts[i].flow_manager = flow_manager;  // Asignar el Flow_Manager
+    
+
+    // Crear hilos para cada barco en queue_LR
+    for (int i = 0; i < flow_manager.ships_in_queue_LR; i++) {
+        contexts[i].ship = &flow_manager.queue_LR[i];        // Asignar el barco
+        contexts[i].flow_manager = &flow_manager;  // Asignar el Flow_Manager
 
         // Crear un hilo para el barco actual
-        pthread_create(&ships_queue[i].thread, NULL, move_ship, &contexts[i]);
+        pthread_create(&flow_manager.queue_LR[i].thread, NULL, move_ship, &contexts[i]);
+
+        usleep(1000000);
     }
 
-    // Esperar a que todos los hilos terminen
-    for (int i = 0; i < num_ships; i++) {
-        pthread_join(ships_queue[i].thread, NULL);
+    // Crear hilos para cada barco en queue_RL
+    for (int i = 0; i < flow_manager.ships_in_queue_RL; i++) {
+        contexts[i].ship = &flow_manager.queue_RL[i];        // Asignar el barco
+        contexts[i].flow_manager = &flow_manager;  // Asignar el Flow_Manager
+
+        // Crear un hilo para el barco actual
+        pthread_create(&flow_manager.queue_RL[i].thread, NULL, move_ship, &contexts[i]);
+
+        usleep(1000000);
+    }
+
+    // Esperar a que todos los hilos terminen en queue_LR
+    for (int i = 0; i < flow_manager.ships_in_queue_LR; i++) {
+        pthread_join(flow_manager.queue_LR[i].thread, NULL);
+    }
+
+    // Esperar a que todos los hilos terminen en queue_RL
+    for (int i = 0; i < flow_manager.ships_in_queue_RL; i++) {
+        pthread_join(flow_manager.queue_RL[i].thread, NULL);
     }
 }
 
@@ -216,6 +268,10 @@ void ready_up_ships(FlowManager* flow_manager, Ship ships_queue[], int num_ships
  * Cierra el canal
  */
 void close_canal() {
+
+    // Esperar a que el hilo del canal termine
+    pthread_join(canal_thread, NULL);
+
     printf("\nDestroying mutexes on canal spaces...\n");
 
     // Destruir los mutexes
@@ -456,15 +512,13 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    // Asigna el argumento de la línea de comandos a SchedulerType
-    // Funcion se encuentra en schedulers.h
+    /* Asigna el argumento de la línea de comandos a SchedulerType */
     SCHEDULER = get_scheduler_type(argv[1]);
     printf("\nParametro obtenido al correr el programa:\n");
     printf("Calendarizador: %d\n\n", SCHEDULER);
 
 
-
-    // Lee y carga la configuración desde el archivo
+    /* Lee y carga la configuración desde el archivo */
     load_configuration("config/canal_config.txt");
 
     // Se imprimen las variables leídas para verificar
@@ -476,14 +530,13 @@ int main(int argc, char *argv[]) {
     printf("Velocidad de barcos PATROL: %d\n", flow_manager.patrol_ship_speed);
     printf("Tiempo de cambio del letrero (Parametro T): %.2f\n", flow_manager.t_param);
     printf("Parametro W: %d\n", flow_manager.w_param);
-
+    // Se imprimen los barcos del archivo
     printf("Array de Ships en cola (Izq -> Der):\n");
     for (int i = 0; i < flow_manager.ships_in_queue_LR; i++) {
         printf("Ship: ID = %d, Tipo = %d, Dirección = %d, Velocidad = %.1f\n", 
                     flow_manager.queue_LR[i].id, flow_manager.queue_LR[i].type,
                     flow_manager.queue_LR[i].direction, flow_manager.queue_LR[i].speed);
     }
-
     printf("Array de Ships en cola (Der -> Izq):\n");
     for (int i = 0; i < flow_manager.ships_in_queue_RL; i++) {
         printf("Ship: ID = %d, Tipo = %d, Dirección = %d, Velocidad = %.1f\n", 
@@ -496,7 +549,7 @@ int main(int argc, char *argv[]) {
     ready_up_canal();
 
     // Alista los barcos creando los threads
-    ready_up_ships(&flow_manager, flow_manager.queue_LR, flow_manager.ships_in_queue_LR);
+    ready_up_ships(flow_manager.queue_LR, flow_manager.ships_in_queue_LR);
     // Iniciar los barcos en la cola de izquierda a derecha (queue_LR)
 
     // Cierra el canal
@@ -504,9 +557,6 @@ int main(int argc, char *argv[]) {
 
     
     /* --------------------------------- Testing simulations --------------------------------- */
-    
-    /* --------------------------------------------------------------------------------------- */
-
 
     /* main program cycle */
     while (canal_is_open) {
@@ -526,8 +576,9 @@ int main(int argc, char *argv[]) {
         // Solo para testing y que termine el programa mientras
         if (ship_count > 9)
             canal_is_open = 0;
-
     }
+
+    /* --------------------------------------------------------------------------------------- */
 
     return 0;
 }

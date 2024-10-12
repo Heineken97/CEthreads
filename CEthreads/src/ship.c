@@ -103,13 +103,36 @@ void free_ship(Ship* ship) {
 }
 
 /*
+ * Configura el progrma cuando el barco termina su recorrido
+ */
+void complete_journey(Ship* ship, FlowManager* flow_manager) {
+
+    printf("Barco %d ha completado su recorrido por el canal.\n", ship->id);
+
+    // aumentar: ships_passed
+    flow_manager->ships_passed_this_cycle++;
+        
+
+
+    // Quitar de array de mid canal
+    // Acomodar array mid canal
+
+    // Agregar a array de done
+
+    // aumentar: total_ships_passed
+    flow_manager->total_ships_passed++; 
+     
+}
+
+/*
  * Function: move_ship
  * -------------------
  * Simulates the movement of a ship through the canal.
  * Each ship checks if the next space is free before advancing.
  * 
  * Parameters:
- * - arg: pointer to a struct containing both the Ship and the Flow_Manager (passed as void* for thread compatibility)
+ * - arg: pointer to a struct containing both the Ship and the Flow_Manager (passed as void*
+ *        for thread compatibility)
  * 
  * Notes:
  * - Ships cannot overtake each other and must wait until the next space is free.
@@ -124,11 +147,14 @@ void* move_ship(void* arg) {
     FlowManager* flow_manager = context->flow_manager;
     int next_position;
 
-    /*
-     * PASAR EL BARCO DE LISTA A MIDCANAL
-     */
-
     while (ship->position < flow_manager->canal_length) {
+
+        // Verificar si el barco puede avanzar
+        while (!ship_can_advance(ship, flow_manager)) {
+            printf("Barco %d esperando permiso para avanzar.\n", ship->id);
+            usleep(BASE_TIME / ship->speed);  // Esperar antes de volver a verificar
+        }
+
         next_position = ship->position + 1;
 
         // Intentar moverse al siguiente espacio
@@ -142,6 +168,7 @@ void* move_ship(void* arg) {
 
             // Mover el barco
             printf("Barco %d avanzando a la posición %d\n", ship->id, next_position);
+
             // Actualiza la posicion del struct del Ship
             ship->position = next_position;
 
@@ -172,11 +199,8 @@ void* move_ship(void* arg) {
         pthread_mutex_unlock(&flow_manager->canal_spaces[ship->position]);
     }
 
-    printf("Barco %d ha completado su recorrido por el canal.\n", ship->id);
-    
-    /*
-     * PASAR EL BARCO DE LISTA A TERMINADO
-     */
+    // Terminar recorrido
+    complete_journey(ship, flow_manager);
 
     return NULL;
 }
