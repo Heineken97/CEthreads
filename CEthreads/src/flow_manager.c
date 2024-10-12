@@ -6,7 +6,10 @@
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
+
 #include "flow_manager.h"
+#include "ship.h"
+#include "schedulers.h"
 
 #define BASE_TIME 1000000
 
@@ -102,21 +105,48 @@ void* manage_canal(void* arg) {
     while (get_ships_yet_to_cross(flow_manager) > 0) {
 
         // Revisa si es necesario calendarizar
-        if (flow_manager->ship_added) {
-            // calendarizar
+        if (flow_manager->queues_changed) {
+
+            pthread_mutex_lock(&flow_manager->ship_queues);
+            printf("Scheduling in progress...\n");
+
+            // Actual implementation:
+            schedule(flow_manager->scheduler,
+                     flow_manager->queue_LR, flow_manager->scheduled_queue_LR,
+                     flow_manager->queue_RL, flow_manager->scheduled_queue_RL, flow_manager->t_param);
+            
+            printf("[SCHEDULER] flow_manager->scheduled_queue_LR:\n");
+            for (int i = 0; i < flow_manager->ships_in_queue_LR; i++) {
+                printf("Scheduled Ship: ID = %d, \n", flow_manager->scheduled_queue_LR[i]);
+            }
+
+            printf("[SCHEDULER] flow_manager->scheduled_queue_RL:\n");
+            for (int i = 0; i < flow_manager->ships_in_queue_RL; i++) {
+                printf("Scheduled Ship: ID = %d, \n", flow_manager->scheduled_queue_RL[i]);
+            }
+
+            pthread_mutex_unlock(&flow_manager->ship_queues);
 
             /* Test example, falta implementar */
-            flow_manager->scheduled_queue_LR[0] = 1;
-            flow_manager->scheduled_queue_LR[1] = 2;
-            flow_manager->scheduled_queue_LR[2] = 3;
-            flow_manager->scheduled_queue_RL[0] = 4;
-            flow_manager->scheduled_queue_RL[1] = 5;
-            flow_manager->scheduled_queue_RL[2] = 6;
-            /* Test example, falta implementar */
+            // flow_manager->scheduled_queue_LR[0] = 3;
+            // flow_manager->scheduled_queue_LR[1] = 2;
+            // flow_manager->scheduled_queue_LR[2] = 1;
+            // flow_manager->scheduled_queue_RL[0] = 6;
+            // flow_manager->scheduled_queue_RL[1] = 4;
+            // flow_manager->scheduled_queue_RL[2] = 5;
 
-            flow_manager->ship_added = 0;
+            // Setea el next Ship
+            pthread_mutex_lock(&flow_manager->next_ship_mutex); // Bloquea el mutex
+            flow_manager->next_ship = (flow_manager->current_direction == 0) ? flow_manager->scheduled_queue_LR[0] : flow_manager->scheduled_queue_RL[0];
+            pthread_mutex_unlock(&flow_manager->next_ship_mutex); // Desloquea el mutex
 
+            // Ya no es necesario calendarizar
+            flow_manager->queues_changed = 0;
+
+            printf("Scheduling done...\n");
         }
+
+
 
 
         // Método EQUITY: permitir W_PARAM Ships antes de cambiar de dirección
@@ -139,9 +169,9 @@ void* manage_canal(void* arg) {
                         // La cantidad de Ships por ingresar será w si hay mas de esa cantidad o de igual cantidad
                         int ships_to_add = (flow_manager->ships_in_queue_LR >= flow_manager->w_param) ? flow_manager->w_param : flow_manager->ships_in_queue_LR;
 
-                        // Ingresa los id de los Ships en el array que podrian estar en el canal
+                        // Ingresa los id de los Ships en el array que podrian estar en el canal que ya estan calendarizados
                         for (int i = 0; i < ships_to_add; i++) {
-                            flow_manager->ids_for_canal[i] = flow_manager->queue_LR[i].id;
+                            flow_manager->ids_for_canal[i] = flow_manager->scheduled_queue_LR[i];
                         }
 
                         // Como se termina de definir los Ships de este ciclo
@@ -167,7 +197,7 @@ void* manage_canal(void* arg) {
 
                         // Ingresa los id de los Ships en el array que podrian estar en el canal
                         for (int i = 0; i < ships_to_add; i++) {
-                            flow_manager->ids_for_canal[i] = flow_manager->queue_RL[i].id;
+                            flow_manager->ids_for_canal[i] = flow_manager->scheduled_queue_RL[i];
                         }
 
                         // Como se termina de definir los Ships de este ciclo
@@ -186,33 +216,53 @@ void* manage_canal(void* arg) {
 
             }
 
-            // Si aun no se termina el ciclo y faltan Ships por pasar el canal
-            else if (flow_manager->ships_passed_this_cycle < flow_manager->w_param) {
+            // Si el ciclo inició
+            else { 
 
-                printf("\n -------- EQUITY Midcycle -------- \n");
+                int ships_to_flow;
 
-            }
-            // Si ya pasaron los W_PARAM Ships de este ciclo
-            else {
+                // La cantidad de Ships por pasar por el canal será w si hay mas de esa cantidad o de igual cantidad
+                if (flow_manager->current_direction == 0){
 
-                // Revisar que los ids del array no estén en el array del queue
-                int not_out_of_queue = check_duplicate_ids(flow_manager);
-                printf("Hay %d Ships aun en el queue y ya terminó su ciclo\n", not_out_of_queue);
+                    ships_to_flow = (flow_manager->ships_in_queue_LR >= flow_manager->w_param) ? flow_manager->w_param : flow_manager->ships_in_queue_LR;
 
-                // Quitar los ids del array y pone todos en 0
-                for (int i = 0; i < MAX_SHIPS; i++) {
-                    flow_manager->ids_for_canal[i] = 0;  // Ids en 0 al inicio
+                } else if (flow_manager->current_direction == 1){
+
+                    ships_to_flow = (flow_manager->ships_in_queue_RL >= flow_manager->w_param) ? flow_manager->w_param : flow_manager->ships_in_queue_RL;
+
+                } else {
+
+                    ships_to_flow = flow_manager->w_param;
+
                 }
+                
+                // Si aun faltan Ships por pasar el canal
+                if (flow_manager->ships_passed_this_cycle < ships_to_flow) {
 
-                // Cambiar de dirección para el nuevo ciclo
-                flow_manager->current_direction = (flow_manager->current_direction == 0) ? 1 : 0;
-                printf("Cambio de dirección: ahora los barcos en la dirección %d podran avanzar.\n",
-                                                                    flow_manager->current_direction);
+                    printf("\n -------- EQUITY Midcycle -------- \n");
 
-                // Se configuran las variables para iniciar un nuevo ciclo
-                flow_manager->ships_for_cycle_ready = 0;
-                flow_manager->ships_passed_this_cycle = 0; // Reiniciar contador de barcos
+                }
+                // Si ya pasaron los W_PARAM Ships de este ciclo
+                else {
 
+                    pthread_mutex_lock(&flow_manager->ship_queues);
+                    move_ships_to_done(flow_manager);
+                    flow_manager->queues_changed = 1;
+                    pthread_mutex_unlock(&flow_manager->ship_queues);
+
+                    // Cambiar de dirección para el nuevo ciclo
+                    flow_manager->current_direction = (flow_manager->current_direction == 0) ? 1 : 0;
+                    printf("Cambio de dirección: ahora los barcos en la dirección %d podran avanzar.\n",
+                                                                        flow_manager->current_direction);
+
+                    // Se configuran las variables para iniciar un nuevo ciclo
+                    flow_manager->ships_for_cycle_ready = 0;
+                    flow_manager->ships_passed_this_cycle = 0; // Reiniciar contador de barcos
+
+                    // Configurar el next_ship despues del cambio de direccion
+                    // Siguiente iteracion calendarizará de nuevo
+
+                }
             }
 
         }
@@ -261,6 +311,115 @@ void* manage_canal(void* arg) {
 }
 
 
+/*
+ * Function: move_ships_to_done
+ * ----------------------------
+ * Moves ships from the corresponding queue (queue_LR or queue_RL) to the 
+ * appropriate done array (done_LR or done_RL) based on the current direction 
+ * and the IDs present in ids_for_canal.
+ * 
+ * This function ensures that:
+ * 1. Ships identified in ids_for_canal are transferred from the queue to the 
+ *    corresponding done array.
+ * 2. Remaining ships in the queue are shifted to maintain the order, leaving no gaps.
+ * 3. Resets the count of ships in midcanal after processing.
+ * 4. Resets the ids_for_canal array after processing to avoid stale data.
+
+ * Parameters:
+ * - flow_manager: pointer to the FlowManager structure containing the arrays, 
+ *   counters, and current flow direction.
+ * 
+ * Notes:
+ * - This function handles both directions of the canal:
+ *   - If the direction is 0 (Left to Right), it processes queue_LR and done_LR.
+ *   - If the direction is 1 (Right to Left), it processes queue_RL and done_RL.
+ * - If the direction is not valid, an error message is printed.
+ * - After processing, the ids_for_canal array is cleared to avoid inconsistencies.
+ */
+void move_ships_to_done(FlowManager* flow_manager) {
+
+    int new_queue_size = 0;  // Index for the adjusted queue_LR array
+
+    // Si la direccion es igual a 0 (I->D)
+    if (flow_manager->current_direction == 0) {
+
+        // Iterate over the current queue_LR array
+        for (int i = 0; i < flow_manager->ships_in_queue_LR; i++) {
+            int ship_id = flow_manager->queue_LR[i].id;
+            int found = 0;
+
+            // Check if the current ship's ID is in ids_for_canal
+            for (int j = 0; j < flow_manager->ships_in_midcanal_LR; j++) {
+                if (flow_manager->ids_for_canal[j] == ship_id) {
+                    // Change Ships done status
+                    flow_manager->queue_LR[i].is_done = 1;
+                    // Move the ship to the done_LR array
+                    int done_index = flow_manager->ships_in_done_LR;
+                    flow_manager->done_LR[done_index] = flow_manager->queue_LR[i];
+                    flow_manager->ships_in_done_LR++;  // Increment the done_LR counter
+                    found = 1;  // Mark the ship as found and moved
+                    break;
+                }
+            }
+
+            // If the ship was not found in ids_for_canal, keep it in the adjusted queue
+            if (!found) {
+                new_queue_size++;
+            }
+        }
+
+        // Update the number of ships in the queue_LR array
+        flow_manager->ships_in_queue_LR = new_queue_size;
+
+        // Resets the number of ships in the midcanal_LR
+        flow_manager->ships_in_midcanal_LR = 0;
+
+    }
+    // Si la direccion es igual a 1 (D->I)
+    else if (flow_manager->current_direction == 1) {
+
+        // Iterate over the current queue_RL array
+        for (int i = 0; i < flow_manager->ships_in_queue_RL; i++) {
+            int ship_id = flow_manager->queue_RL[i].id;
+            int found = 0;
+
+            // Check if the current ship's ID is in ids_for_canal
+            for (int j = 0; j < flow_manager->ships_in_midcanal_RL; j++) {
+                if (flow_manager->ids_for_canal[j] == ship_id) {
+                    // Move the ship to the done_RL array
+                    int done_index = flow_manager->ships_in_done_RL;
+                    flow_manager->done_RL[done_index] = flow_manager->queue_RL[i];
+                    flow_manager->ships_in_done_RL++;  // Increment the done_RL counter
+                    found = 1;  // Mark the ship as found and moved
+                    // Change Ships done status
+                    flow_manager->queue_RL[i].is_done = 1;
+                    break;
+                }
+            }
+
+            // If the ship was not found in ids_for_canal, keep it in the adjusted queue
+            if (!found) {
+                new_queue_size++;
+            }
+        }
+
+        // Update the number of ships in the queue_RL array
+        flow_manager->ships_in_queue_RL = new_queue_size;
+
+        // Resets the number of ships in the midcanal_RL
+        flow_manager->ships_in_midcanal_RL = 0;
+    }
+    // Error en la direccion
+    else {
+        printf("ERROR @ flow_manager.c (move_ships_to_done): undefined flow_manager->current_direction\n");
+    }
+
+    // Quitar los ids del array y pone todos en 0
+    for (int i = 0; i < MAX_SHIPS; i++) {
+        flow_manager->ids_for_canal[i] = 0;  // Ids en 0
+    }
+
+}
 
 
 
@@ -291,39 +450,64 @@ int ship_can_advance(Ship* ship, FlowManager* flow_manager) {
      */
     // Permiterá saber si el ship que está esperando es el siguiente en la lista
     // DEPENDIENDO DE LA DIRECCION
-    if (flow_manager->current_direction == 0) {
+    if (flow_manager->current_direction == 0 && ship->position <= 1) {
 
         // Direction Left-to-Right (queue_LR)
-        if (flow_manager->scheduled_queue_LR[0] == ship->id) {
+        if (flow_manager->next_ship == ship->id) {
 
-            // Shift elements in scheduled_queue_LR to the left
-            for (int i = 0; i < flow_manager->ships_in_queue_LR - 1; i++) {
-                flow_manager->scheduled_queue_LR[i] = flow_manager->scheduled_queue_LR[i + 1];
+            // Solo si salio de la posicion 0 y no es el ultimo del ciclo cambia al siguiente next de esta direccion
+            if (ship->position > 0 && flow_manager->ships_in_midcanal_LR <= flow_manager->w_param) {
+
+                pthread_mutex_lock(&flow_manager->next_ship_mutex); // Bloquea el mutex
+
+                // Shift elements in scheduled_queue_LR to the left
+                for (int i = 0; i < flow_manager->ships_in_queue_LR - 1; i++) {
+                    flow_manager->scheduled_queue_LR[i] = flow_manager->scheduled_queue_LR[i + 1];
+                }
+
+                // Cambia al siguiente ship
+                flow_manager->next_ship = flow_manager->scheduled_queue_LR[0];
+                pthread_mutex_unlock(&flow_manager->next_ship_mutex); // Bloquea el mutex
             }
+
             printf("El Barco %d is next.\n", ship->id);
             is_next = 1;  // 1 to indicate that the ship is next
+
         } else {
             printf("El Barco %d is not next.\n", ship->id);
             is_next = 0;  // 0 if no match is found
         }
-    } else if (flow_manager->current_direction == 1) {
+    } else if (flow_manager->current_direction == 1 && ship->position <= 1) {
 
         // Direction Right-to-Left (queue_RL)
-        if (flow_manager->scheduled_queue_RL[0] == ship->id) {
+        if (flow_manager->next_ship == ship->id) {
 
-            // Shift elements in scheduled_queue_RL to the left
-            for (int i = 0; i < flow_manager->ships_in_queue_RL - 1; i++) {
-                flow_manager->scheduled_queue_RL[i] = flow_manager->scheduled_queue_RL[i + 1];
+            // Solo si salio de la posicion 0 y no es el ultimo del ciclo cambia al siguiente next de esta direccion
+            if (ship->position > 0 && flow_manager->ships_in_midcanal_RL < flow_manager->w_param) {
+
+                pthread_mutex_lock(&flow_manager->next_ship_mutex); // Bloquea el mutex
+
+                // Shift elements in scheduled_queue_RL to the left
+                for (int i = 0; i < flow_manager->ships_in_queue_RL - 1; i++) {
+                    flow_manager->scheduled_queue_RL[i] = flow_manager->scheduled_queue_RL[i + 1];
+                }
+
+                // Cambia al siguiente ship
+                flow_manager->next_ship = flow_manager->scheduled_queue_RL[0];
+                pthread_mutex_unlock(&flow_manager->next_ship_mutex); // Bloquea el mutex
             }
 
+            printf("El Barco %d is next.\n", ship->id);
             is_next = 1;  // 1 to indicate that the ship is next
+
         } else {
+            printf("El Barco %d is not next.\n", ship->id);
             is_next = 0;  // 0 if no match is found
         }
     }
     
 
-    if (is_next) {
+    if (is_next || ship->position > 0) {
 
         // Dependiendo del método de flujo se aplican restricciones
         if (flow_manager->method == EQUITY) {
@@ -334,8 +518,26 @@ int ship_can_advance(Ship* ship, FlowManager* flow_manager) {
                 return 0;  // El barco no puede avanzar porque la dirección no está activa
             }
 
+            int ships_to_flow;
+
+            // La cantidad de Ships por pasar por el canal será w si hay mas de esa cantidad o de igual cantidad
+            if (flow_manager->current_direction == 0){
+
+                ships_to_flow = (flow_manager->ships_in_queue_LR >= flow_manager->w_param) ? flow_manager->w_param : flow_manager->ships_in_queue_LR;
+
+            } else if (flow_manager->current_direction == 1){
+
+                ships_to_flow = (flow_manager->ships_in_queue_RL >= flow_manager->w_param) ? flow_manager->w_param : flow_manager->ships_in_queue_RL;
+
+            } else {
+
+                ships_to_flow = flow_manager->w_param;
+
+            }
+            
+
             // Ya se completaron los W_PARAM Ships de este ciclo, no puede pasar
-            if (flow_manager->ships_passed_this_cycle >= flow_manager->w_param) {
+            if (flow_manager->ships_passed_this_cycle >= ships_to_flow) {
                 printf("No más barcos pueden avanzar en esta dirección hasta que se cambie.\n");
                 return 0;  // No más barcos pueden avanzar en esta dirección hasta que se cambie
             }
@@ -371,7 +573,7 @@ int ship_can_advance(Ship* ship, FlowManager* flow_manager) {
                             // Finds the index of the ship in the queue_LR array
                             // Loops through the queue_LR array to locate the ship that matches the id of the ship being moved.
                             for (int i = 0; i < flow_manager->ships_in_queue_LR; i++) {
-                                if (flow_manager->queue_LR[i].id == ship->id) {
+                                if (flow_manager->scheduled_queue_LR[i] == ship->id) {
                                     ship_index = i;
                                     printf("Ship with ID %d was found in queue_LR @ i = %d.\n", ship->id, i);
                                     break;
@@ -385,16 +587,18 @@ int ship_can_advance(Ship* ship, FlowManager* flow_manager) {
                             }
 
                             // Adds the ship to the end of the midcanal_LR array
+                            // Creo que esto no se va a usar mas
                             flow_manager->midcanal_LR[flow_manager->ships_in_midcanal_LR] = *ship;      // Place the ship in midcanal_LR's last position
+                            // Esto si es importante, ver si ponerle mutex
                             flow_manager->ships_in_midcanal_LR++;               // Increment the counter for ships in midcanal_LR
 
                             // Removes the Ship from the queue_LR array by shifting remaining ships
-                            for (int i = ship_index; i < flow_manager->ships_in_queue_LR - 1; i++) {
-                                flow_manager->queue_LR[i] = flow_manager->queue_LR[i + 1];  // Shift Ships left to fill the gap
-                            }
+                            //for (int i = ship_index; i < flow_manager->ships_in_queue_LR - 1; i++) {
+                            //    flow_manager->queue_LR[i] = flow_manager->queue_LR[i + 1];  // Shift Ships left to fill the gap
+                            //}
 
                             // Decreases the counter for ships in queue_LR as the ship has been removed
-                            flow_manager->ships_in_queue_LR--;
+                            //flow_manager->ships_in_queue_LR--;
 
                             // Ship was successfully moved
                             printf("Barco %d pasó de queue_LR a midcanal_LR.\n", ship->id);
@@ -409,7 +613,7 @@ int ship_can_advance(Ship* ship, FlowManager* flow_manager) {
                             // Finds the index of the ship in the queue_RL array
                             // Loops through the queue_RL array to locate the ship that matches the id of the ship being moved.
                             for (int i = 0; i < flow_manager->ships_in_queue_RL; i++) {
-                                if (flow_manager->queue_RL[i].id == ship->id) {
+                                if (flow_manager->scheduled_queue_RL[i] == ship->id) {
                                     ship_index = i;
                                     break;
                                 }
@@ -426,12 +630,12 @@ int ship_can_advance(Ship* ship, FlowManager* flow_manager) {
                             flow_manager->ships_in_midcanal_RL++;               // Increment the counter for ships in midcanal_RL
 
                             // Removes the Ship from the queue_RL array by shifting remaining ships
-                            for (int i = ship_index; i < flow_manager->ships_in_queue_RL - 1; i++) {
-                                flow_manager->queue_RL[i] = flow_manager->queue_RL[i + 1];  // Shift Ships left to fill the gap
-                            }
+                            //for (int i = ship_index; i < flow_manager->ships_in_queue_RL - 1; i++) {
+                            //    flow_manager->queue_RL[i] = flow_manager->queue_RL[i + 1];  // Shift Ships left to fill the gap
+                            //}
 
                             // Decreases the counter for ships in queue_RL as the ship has been removed
-                            flow_manager->ships_in_queue_RL--;
+                            //flow_manager->ships_in_queue_RL--;
 
                             // Ship was successfully moved
                             printf("Barco %d pasó de queue_RL a midcanal_RL.\n", ship->id);
@@ -479,68 +683,4 @@ int ship_can_advance(Ship* ship, FlowManager* flow_manager) {
     printf("Shouldn't reach here @ flow_manager (ship_can_advance)");
     return 0;
 
-}
-
-
-/*
- * Function: check_duplicate_ids
- * -----------------------------
- * Verifica si los ids en el array ids_for_canal ya existen en el array de ships en su respectiva cola.
- * 
- * Parameters:
- * - ids_for_canal: array de ints con los IDs que se deben verificar
- * - num_ids: cantidad de IDs en el array ids_for_canal
- * - queue_LR: array de Ships de izquierda a derecha (Izq -> Der)
- * - ships_in_queue_LR: cantidad de Ships en el array queue_LR
- * - queue_RL: array de Ships de derecha a izquierda (Der -> Izq)
- * - ships_in_queue_RL: cantidad de Ships en el array queue_RL
- * 
- * Returns:
- * - cantidad de Ships duplicados
- */
-// int check_duplicate_ids(int ids_for_canal[], int num_ids, Ship queue_LR[], int ships_in_queue_LR, Ship queue_RL[], int ships_in_queue_RL) {
-int check_duplicate_ids(FlowManager* flow_manager) {
-
-    int n = 0;
-
-    // Si la direccion es igual a 0 (I->D)
-    if (flow_manager->current_direction == 0) {
-
-        // Recorrer los IDs en ids_for_canal[]
-        for (int i = 0; i < MAX_SHIPS; i++) {
-        
-            // Verificar en la lista queue_LR (Izq -> Der)
-            for (int j = 0; j < flow_manager->ships_in_queue_LR; j++) {
-                if (flow_manager->ids_for_canal[i] == flow_manager->queue_LR[j].id) {
-                    printf("!!! ID duplicado encontrado en queue_LR: %d\n", flow_manager->ids_for_canal[i]);
-                    n++;  // Agrega 1 si se encuentra un duplicado en queue_LR
-                }
-            }
-
-        }
-
-    }
-    // Si la direccion es igual a 1 (D->I)
-    else if (flow_manager->current_direction == 1) {
-
-        // Recorrer los IDs en ids_for_canal[]
-        for (int i = 0; i < MAX_SHIPS; i++) {
-
-            // Verificar en la lista queue_RL (Der -> Izq)
-            for (int k = 0; k < flow_manager->ships_in_queue_RL; k++) {
-                if (flow_manager->ids_for_canal[i] == flow_manager->queue_RL[k].id) {
-                    printf("!!! ID duplicado encontrado en queue_RL: %d\n", flow_manager->ids_for_canal[i]);
-                    n++;  // Agrega 1 si se encuentra un duplicado en queue_RL
-                }
-            }
-
-        }
-
-    }
-    // Error en la direccion
-    else {
-        printf("ERROR @ flow_manager.c (check_duplicate_ids): undefined flow_manager->current_direction\n");
-    }
-
-    return n;  // Retorna la cantidad
 }

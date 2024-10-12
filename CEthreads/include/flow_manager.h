@@ -5,9 +5,11 @@
 #ifndef FLOW_MANAGER_H
 #define FLOW_MANAGER_H
 
-#include "ship.h"
+
 // #include "CEthreads.h"
 #include <pthread.h>
+#include "ship.h"
+#include "schedulers.h"
 
 #define MAX_SHIPS 100
 #define MAX_LENGTH 100
@@ -23,6 +25,7 @@ typedef enum {
 // Structure that represents a flow manager
 typedef struct {
 
+    SchedulerType scheduler;        // Calendarizador que ordenara los Ships
     // Initialized in load_configuration(filename) @ main.c
     FlowMethod method;              // Metodo por el cual se regira el programa
     // Initialized in load_configuration(filename) @ main.c
@@ -48,6 +51,8 @@ typedef struct {
     // Initialized in load_configuration(filename) @ main.c
     int ships_in_queue_LR;          // Cantidad de Ships en queue_LR
     Ship queue_LR[MAX_SHIPS];       // Array de Ships en cola (Izq -> Der)
+    // Initialized in ready_up_canal() @ main.c
+    pthread_mutex_t ship_queues;
     // Initialized in load_configuration(filename) @ main.c
     int ships_in_queue_RL;          // Cantidad de Ships en queue_RL
     Ship queue_RL[MAX_SHIPS];       // Array de Ships en cola (Der -> Izq)
@@ -60,7 +65,10 @@ typedef struct {
     int ships_in_done_RL;           // Cantidad de Ships en done_RL
     Ship done_RL[MAX_SHIPS];        // Array de Ships que ya pasaron el canal (Der -> Izq)
     /* Schedulers queue */
-    int ship_added;                 // Dice si se ha agregado un ship recientemente
+    int queues_changed;             // Dice si han cambiado los queues
+    // Initialized in ready_up_canal() @ main.c
+    pthread_mutex_t next_ship_mutex;
+    int next_ship;
     int scheduled_queue_LR[MAX_SHIPS];  // Array con los ids de los Ships ordenados (Izq -> Der)
     int scheduled_queue_RL[MAX_SHIPS];  // Array con los ids de los Ships ordenados (Der -> Izq)
     /* EQUITY */
@@ -93,7 +101,7 @@ void* manage_canal(void* arg);
 // Function that determines if the ship is allowed to advance 
 int ship_can_advance(Ship* ship, FlowManager* flow_manager);
 
-// Revisa si hay ids duplicados en arrays del queue y el array de ids
-int check_duplicate_ids(FlowManager* flow_manager);
+//
+void move_ships_to_done(FlowManager* flow_manager);
 
 #endif // FLOW_MANAGER_H

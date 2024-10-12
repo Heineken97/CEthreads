@@ -29,7 +29,7 @@ ship(NORMAL,1)
 
 # Parámetro W para el control de flujo de equidad
 # (cantidad de barcos que cruzan antes de cambiar de dirección)
-w_param: 3
+w_param: 2
 
 # Tiempo de cambio del letrero
 # (en segundos, solo aplica si se usa el método de control "SIGN")

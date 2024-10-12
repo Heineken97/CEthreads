@@ -7,6 +7,7 @@
 // #include "CEthreads.h"
 #include <pthread.h>
 #include <unistd.h>
+
 #include "ship.h"
 #include "flow_manager.h"
 
@@ -40,31 +41,9 @@ Ship* create_ship(int id, ShipType type, int direction, double speed) {
     new_ship->speed = speed;
     new_ship->priority = -1;
     new_ship->position = 0;
-
+    new_ship->is_done = 0;
 
     return new_ship;
-}
-
-/*
- * Function: update_position
- * -------------------------
- * Updates the position of the ship in the canal.
- * 
- * Parameters:
- * - ship: pointer to the Ship struct
- * - new_position: the new position of the ship in the canal
- * 
- * Notes:
- * - This function modifies the position attribute of the Ship struct.
- * - Ensure that the ship pointer is valid (not NULL) before calling this function.
- */
-void update_position(Ship* ship, int new_position) {
-    if (ship == NULL) {
-        perror("Ship pointer is NULL");
-        exit(EXIT_FAILURE);
-    }
-
-    ship->position = new_position;
 }
 
 /*
@@ -102,27 +81,11 @@ void free_ship(Ship* ship) {
     free(ship);
 }
 
-/*
- * Configura el progrma cuando el barco termina su recorrido
- */
-void complete_journey(Ship* ship, FlowManager* flow_manager) {
-
-    printf("Barco %d ha completado su recorrido por el canal.\n", ship->id);
-
-    // aumentar: ships_passed
-    flow_manager->ships_passed_this_cycle++;
-        
 
 
-    // Quitar de array de mid canal
-    // Acomodar array mid canal
 
-    // Agregar a array de done
 
-    // aumentar: total_ships_passed
-    flow_manager->total_ships_passed++; 
-     
-}
+
 
 /*
  * Function: move_ship
@@ -200,7 +163,13 @@ void* move_ship(void* arg) {
     }
 
     // Terminar recorrido
-    complete_journey(ship, flow_manager);
+    printf("Barco %d ha completado su recorrido por el canal.\n", ship->id);
+
+    // aumentar: ships_passed
+    flow_manager->ships_passed_this_cycle++;
+
+    // aumentar: total_ships_passed
+    flow_manager->total_ships_passed++; 
 
     return NULL;
 }

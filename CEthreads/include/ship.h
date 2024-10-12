@@ -23,15 +23,13 @@ typedef struct {
     double speed;           // Speed of the ship
     int priority;           // Priority level (for scheduling algorithms)
     int position;           // Position in channel
+    int is_done;            // If Ship completed its journey
     // CEthread thread; // Hilo asociado al barco
     pthread_t thread;       // Hilo asociado al barco
 } Ship;
 
 // Function to create a new ship
 Ship* create_ship(int id, ShipType type, int direction, double speed);
-
-// Function to update the position of the ship in the canal
-void update_position(Ship* ship, int new_position);
 
 // Function to print ship information (for debugging purposes)
 void print_ship(Ship* ship);

@@ -16,7 +16,6 @@
 //#include "CEthreads.h"
 #include "ship.h"
 #include "schedulers.h"
-// #include "flow_methods.h"
 #include "flow_manager.h"
 
 
@@ -26,9 +25,6 @@
 
 /* Program variable to start/stop execution */
 int canal_is_open = 0;
-
-/* Scheduler to be used in program */
-SchedulerType SCHEDULER;
 
 /* Ships created */
 int ship_count = 0;
@@ -97,8 +93,8 @@ void load_configuration(const char* filename) {
                 break;
             }
 
-            if (!flow_manager.ship_added) {
-                flow_manager.ship_added = 1;
+            if (!flow_manager.queues_changed) {
+                flow_manager.queues_changed = 1;
             }
 
             // Leer el tipo de barco y la dirección dentro de ship(...)
@@ -189,8 +185,13 @@ void ready_up_canal(){
         flow_manager.space_state[i] = 0;  // Espacios libres al inicio
     }
 
+    printf("\nInitializaing variables on schedules...\n");
+    pthread_mutex_init(&flow_manager.next_ship_mutex, NULL);
+    flow_manager.next_ship = 0;  // Id que iniciará
+
     printf("\nInitializaing variables on flow_manager for flow methods...\n");
 
+    pthread_mutex_init(&flow_manager.ship_queues, NULL);
     // Inicializar el array para saber los ids que van al canal en EQUITY
     // Ningun barco tendrá id 0 
     for (int i = 0; i < MAX_SHIPS; i++) {
@@ -204,6 +205,7 @@ void ready_up_canal(){
     // Crea hilo para el flow_manager
     pthread_create(&canal_thread, NULL, manage_canal, &flow_manager);
 
+    usleep(1000000);
 
     printf("\nOpening canal...\n");
     // Ships are now allowed to flow
@@ -239,7 +241,7 @@ void ready_up_ships() {
         // Crear un hilo para el barco actual
         pthread_create(&flow_manager.queue_LR[i].thread, NULL, move_ship, &contexts[i]);
 
-        usleep(1000000);
+        // usleep(1000000);
     }
 
     // Crear hilos para cada barco en queue_RL
@@ -250,7 +252,7 @@ void ready_up_ships() {
         // Crear un hilo para el barco actual
         pthread_create(&flow_manager.queue_RL[i].thread, NULL, move_ship, &contexts[i]);
 
-        usleep(1000000);
+        // usleep(1000000);
     }
 
     // Esperar a que todos los hilos terminen en queue_LR
@@ -345,82 +347,6 @@ void send_state() {
 }
 
 
-/*
- * Function: schedule
- * ------------------
- * Schedules the available ships using the selected scheduling algorithm.
- * 
- * Notes:
- * - This function simulates the scheduling of ships based on the global variable `SCHEDULER`.
- * - Depending on the scheduling algorithm selected (e.g., ROUND_ROBIN, PRIORITY), the
- *   corresponding scheduler function is called.
- * - If the scheduler type is unrecognized, an error is printed, and the program exits.
- */
-void schedule() {
-
-    printf("\nSimulating scheduling ships...\n");
-
-    switch (SCHEDULER) {
-        case ROUND_ROBIN:
-            round_robin_scheduler(flow_manager.queue_LR, flow_manager.ships_in_queue_LR,
-                                  flow_manager.t_param);
-            round_robin_scheduler(flow_manager.queue_RL, flow_manager.ships_in_queue_RL,
-                                  flow_manager.t_param);
-            break;
-        case PRIORITY:
-            priority_scheduler(flow_manager.queue_LR, flow_manager.ships_in_queue_LR);
-            priority_scheduler(flow_manager.queue_RL, flow_manager.ships_in_queue_RL);
-            break;
-        case SJF:
-            sjf_scheduler(flow_manager.queue_LR, flow_manager.ships_in_queue_LR);
-            sjf_scheduler(flow_manager.queue_RL, flow_manager.ships_in_queue_RL);
-            break;
-        case FCFS:
-            fcfs_scheduler(flow_manager.queue_LR, flow_manager.ships_in_queue_LR);
-            fcfs_scheduler(flow_manager.queue_RL, flow_manager.ships_in_queue_RL);
-            break;
-        case REAL_TIME:
-            real_time_scheduler(flow_manager.queue_LR, flow_manager.ships_in_queue_LR);
-            real_time_scheduler(flow_manager.queue_RL, flow_manager.ships_in_queue_RL);
-            break;
-        default:
-            printf("Scheduler no reconocido.\n");
-            exit(EXIT_FAILURE);
-    }
-}
-
-
-/*
- * Function: flow
- * --------------
- * Simulates the flow control method for managing the ships in the canal.
- * 
- * Notes:
- * - The function chooses the flow control method based on the global variable `FLOW_METHOD`.
- * - It calls the corresponding flow control function (e.g., equity_flow, sign_flow, tico_flow).
- * - If no valid flow method is selected, it prints a message indicating that no flow method
- *   was chosen.
- */
-void flow() {
-    
-    printf("\nSimulating flow control method...\n");
-
-    switch (flow_manager.method) {
-        case EQUITY:
-            equity_flow(flow_manager.w_param);  // Método de equidad
-            break;
-        case SIGN:
-            sign_flow(flow_manager.t_param);  // Método de letrero con cambio
-            break;
-        case TICO:
-            tico_flow();  // Método Tico
-            break;
-        case NONE:
-        default:
-            printf("No flow method selected\n");
-    }
-}
-
 
 /*
  * Function: manage_new_ships
@@ -513,9 +439,9 @@ int main(int argc, char *argv[]) {
     }
 
     /* Asigna el argumento de la línea de comandos a SchedulerType */
-    SCHEDULER = get_scheduler_type(argv[1]);
+    flow_manager.scheduler = get_scheduler_type(argv[1]);
     printf("\nParametro obtenido al correr el programa:\n");
-    printf("Calendarizador: %d\n\n", SCHEDULER);
+    printf("Calendarizador: %d\n\n", flow_manager.scheduler);
 
 
     /* Lee y carga la configuración desde el archivo */
@@ -549,7 +475,7 @@ int main(int argc, char *argv[]) {
     ready_up_canal();
 
     // Alista los barcos creando los threads
-    ready_up_ships(flow_manager.queue_LR, flow_manager.ships_in_queue_LR);
+    ready_up_ships();
     // Iniciar los barcos en la cola de izquierda a derecha (queue_LR)
 
     // Cierra el canal
@@ -565,10 +491,10 @@ int main(int argc, char *argv[]) {
         send_state();
 
         /* Schedule ships */
-        schedule();
+        //schedule();
 
         /* Make ships flow */
-        flow();
+        // flow();
 
         /* Check if new ships have been added */
         manage_new_ships();
