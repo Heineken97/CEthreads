@@ -118,19 +118,19 @@ void* move_ship(void* arg) {
             usleep(BASE_TIME / ship->speed);  // Esperar antes de volver a verificar
         }
 
+        // Gets the position that the Ship is trying to access
         next_position = ship->position + 1;
 
         // Intentar moverse al siguiente espacio
         pthread_mutex_lock(&flow_manager->canal_spaces[next_position]); // Bloquea el mutex
 
-        if (flow_manager->space_state[next_position] == 0) {  // Si el espacio está libre
+        // Verifica si el espacio está libre
+        if (flow_manager->space_state[next_position] == 0) {
 
-            flow_manager->space_state[next_position] = 1;     // Ocupar el espacio
+            // Como no hay Ships en este, ocupa el espacio
+            flow_manager->space_state[next_position] = 1;
             printf("Barco %d ocupando la posición %d\n", ship->id, next_position);
             pthread_mutex_unlock(&flow_manager->canal_spaces[next_position]);   // Desbloquea el mutex
-
-            // Mover el barco
-            printf("Barco %d avanzando a la posición %d\n", ship->id, next_position);
 
             // Actualiza la posicion del struct del Ship
             ship->position = next_position;
@@ -145,6 +145,7 @@ void* move_ship(void* arg) {
 
             // Simular el tiempo que tarda en moverse según la velocidad
             usleep(BASE_TIME / ship->speed);  // Esperar en microsegundos (según la velocidad)
+            
         } else {
             // Si el espacio está ocupado, liberar el mutex y esperar antes de intentar de nuevo
             pthread_mutex_unlock(&flow_manager->canal_spaces[next_position]);

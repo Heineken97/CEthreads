@@ -98,10 +98,16 @@ int get_ships_yet_to_cross(FlowManager* flow_manager);
 // Function to manage the canal and the Ships that flows through it
 void* manage_canal(void* arg);
 
+// Moves ships from the corresponding queue to the appropriate done array 
+void move_ships_to_done(FlowManager* flow_manager);
+
+// Defines the quantity of ships to complete their journey this cycle
+int get_ships_on_cycle(FlowManager* flow_manager);
+
 // Function that determines if the ship is allowed to advance 
 int ship_can_advance(Ship* ship, FlowManager* flow_manager);
 
-//
-void move_ships_to_done(FlowManager* flow_manager);
+// Checks if ship is next on the canal
+int ship_is_next(Ship* ship, FlowManager* flow_manager);
 
 #endif // FLOW_MANAGER_H

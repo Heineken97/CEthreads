@@ -288,6 +288,14 @@ void close_canal() {
 }
 
 
+
+
+
+
+
+
+
+
 /*
  * Function: send_state
  * --------------------
@@ -333,8 +341,8 @@ void send_state() {
     printf("Array de Ships en medio canal (Der -> Izq):\n");
     for (int i = 0; i < flow_manager.ships_in_midcanal_RL; i++) {
         printf("Ship: ID = %d, Tipo = %d, Dirección = %d, Velocidad = %.1f\n", 
-                    flow_manager.midcanal_LR[i].id, flow_manager.midcanal_LR[i].type,
-                    flow_manager.midcanal_LR[i].direction, flow_manager.midcanal_LR[i].speed);
+                    flow_manager.midcanal_RL[i].id, flow_manager.midcanal_RL[i].type,
+                    flow_manager.midcanal_RL[i].direction, flow_manager.midcanal_RL[i].speed);
     }
 
     printf("Array de Ships que ya pasaron el canal (Der -> Izq):\n");
@@ -345,8 +353,6 @@ void send_state() {
     }
     
 }
-
-
 
 /*
  * Function: manage_new_ships
@@ -423,6 +429,12 @@ void manage_new_ships() {
 
 
 
+
+
+
+
+
+
 /*
  * Function: main
  * --------------
@@ -476,7 +488,6 @@ int main(int argc, char *argv[]) {
 
     // Alista los barcos creando los threads
     ready_up_ships();
-    // Iniciar los barcos en la cola de izquierda a derecha (queue_LR)
 
     // Cierra el canal
     close_canal();
