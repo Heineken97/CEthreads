@@ -2,6 +2,10 @@ import tkinter as tk
 import tkinter.ttk as ttk
 from collections import deque
 import random
+import struct
+import os
+import time
+import threading
 
 barcos = []
 canal_size = 5  # Definir la longitud del canal
@@ -62,14 +66,6 @@ class CanalApp:
         self.puerto_B_entrada_frame.pack()
         self.actualizar_puerto_B_entrada()
 
-        # Botones de control
-        control_frame = tk.Frame(main_frame)
-        control_frame.grid(row=2, column=1, pady=20)  # Centrar en la fila inferior
-        tk.Button(control_frame, text="Movimiento de Puerto A", command=self.mover_desde_A).pack(side=tk.LEFT, padx=5)
-        tk.Button(control_frame, text="Movimiento de Puerto B", command=self.mover_desde_B).pack(side=tk.LEFT, padx=5)
-        tk.Button(control_frame, text="Agregar barcos definidos", command=self.agregar_barcos_definidos).pack(side=tk.LEFT, padx=5)
-        tk.Button(control_frame, text="Agregar barcos aleatorios", command=self.agregar_barcos_aleatorios).pack(side=tk.LEFT, padx=5)
-        
         # Crear un frame para la tabla de referencias
         frame_referencias = tk.Frame(main_frame)
         frame_referencias.grid(row=3, column=1, padx=10, pady=10)
@@ -86,156 +82,146 @@ class CanalApp:
         frame_algoritmos = tk.Frame(main_frame)
         frame_algoritmos.grid(row=4, column=1, padx=10, pady=10)
 
-    def mover_desde_A(self):
-        # Tomar el barco de Puerto A Salida
-        if self.puerto_A_salida:
-            barco = self.puerto_A_salida.pop(-1)  # Elimina el barco de la cola
-            self.actualizar_puerto_A()
-            # Mover el barco por cada posición del canal
-            for i in range(canal_size):
-                if i > 0:
-                    self.canal[i - 1] = None  # Libera la posición anterior si existe un barco
-                self.canal[i] = barco  # Mueve el barco a la posición actual
-                self.actualizar_canal()
-                self.root.update()  # Simula el movimiento sin delay
-                self.root.after(500)  # Simula el movimiento con una pausa
-            # Colocar el barco en Puerto B Entrada
-            self.puerto_B_entrada.append(barco)
-            self.actualizar_puerto_B_entrada()
-            self.canal = [None] * canal_size  # Vaciar el canal
-            self.actualizar_canal()
-    def mover_desde_B(self):
-        # Tomar el barco de Puerto B Salida
-        if self.puerto_B_salida:
-            barco = self.puerto_B_salida.pop(0)  # Eliminar el primer barco de la lista
-            self.actualizar_puerto_B()
-            # Mover el barco por cada posición del canal (en orden inverso)
-            for i in range(canal_size - 1, -1, -1):
-                if i < canal_size - 1:
-                    self.canal[i + 1] = None  # Libera la posición anterior si existe un barco
-                self.canal[i] = barco  # Mueve el barco a la posición actual
-                self.actualizar_canal()
-                self.root.update()  # Simula el movimiento sin delay
-                self.root.after(500)  # Simula el movimiento con una pausa
-            # Colocar el barco en Puerto A Entrada
-            self.puerto_A_entrada.append(barco)
-            self.actualizar_puerto_A_entrada()
-            self.canal = [None] * canal_size  # Vaciar el canal
-            self.actualizar_canal()
-            
-                
-    def agregar_barcos_definidos(self):
-        # Crear una ventana emergente para agregar barcos definidos
-        ventana = tk.Toplevel(self.root)
-        ventana.title("Agregar barcos definidos")
-        # Crear un frame para agregar barcos
-        frame = tk.Frame(ventana)
-        frame.pack(padx=10, pady=10)
-        # Crear botones para agregar cada tipo de barco
-        def agregar_normal_A():
-            self.puerto_A_salida.insert(0, "Normal")
-            self.actualizar_puerto_A()
-        def agregar_patrulla_A():
-            self.puerto_A_salida.insert(0, "Patrulla")
-            self.actualizar_puerto_A()
-        def agregar_pesquero_A():
-            self.puerto_A_salida.insert(0, "Pesquero")
-            self.actualizar_puerto_A()
-        def agregar_normal_B():
-            self.puerto_B_salida.append("Normal")
-            self.actualizar_puerto_B()
-        def agregar_patrulla_B():
-            self.puerto_B_salida.append("Patrulla")
-            self.actualizar_puerto_B()
-        def agregar_pesquero_B():
-            self.puerto_B_salida.append("Pesquero")
-            self.actualizar_puerto_B()
-        # Crear botones para eliminar el último barco ingresado
-        def eliminar_ultimo_A():
-            if self.puerto_A_salida:
-                self.puerto_A_salida.pop()
-                self.actualizar_puerto_A()
-        def eliminar_ultimo_B():
-            if self.puerto_B_salida:
-                self.puerto_B_salida.pop()
-                self.actualizar_puerto_B()
-        # Crear un frame para los botones de A
-        frame_A = tk.Frame(frame)
-        frame_A.pack(side=tk.LEFT, padx=10)
-        tk.Button(frame_A, text="Normal A", command=agregar_normal_A).pack()
-        tk.Button(frame_A, text="Patrulla A", command=agregar_patrulla_A).pack()
-        tk.Button(frame_A, text="Pesquero A", command=agregar_pesquero_A).pack()
-        tk.Button(frame_A, text="Eliminar último A", command=eliminar_ultimo_A).pack()
-        # Crear un frame para los botones de B
-        frame_B = tk.Frame(frame)
-        frame_B.pack(side=tk.LEFT, padx=10)
-        tk.Button(frame_B, text="Normal B", command=agregar_normal_B).pack()
-        tk.Button(frame_B, text="Patrulla B", command=agregar_patrulla_B).pack()
-        tk.Button(frame_B, text="Pesquero B", command=agregar_pesquero_B).pack()
-        tk.Button(frame_B, text="Eliminar último B", command=eliminar_ultimo_B).pack()
-        ## Crear un frame para el botón de salir
-        frame_salir = tk.Frame(frame)
-        frame_salir.pack(side=tk.LEFT, padx=10)
-        def salir():
-            ventana.destroy()
-        tk.Button(frame_salir, text="Salir", command=salir).pack()
-        
-    def agregar_barcos_aleatorios(self):
-        # Agregar algunos elementos a la lista barcos
-        barcos = ["Normal", "Patrulla", "Pesquero"]
-        # Agregar un barco aleatorio a uno de los puertos
-        barco = random.choice(barcos)
-        if random.choice([True, False]):
-            self.puerto_A_salida.append(barco)
-            self.actualizar_puerto_A()
-        else:
-            self.puerto_B_salida.append(barco)
-            self.actualizar_puerto_B()
-    def actualizar_canal(self):
-        # Actualiza las etiquetas del canal para reflejar el estado actual
-        for i, label in enumerate(self.canal_labels):
-            if self.canal[i] is None:
-                label.config(text="Espacio " + str(i + 1))
-                for widget in label.winfo_children():
-                    widget.destroy()
-            else:
-                label.config(text=self.canal[i])
-                self.draw_boat(label, self.canal[i])
-    def actualizar_puerto_A(self):
-        self._actualizar_puerto(self.puerto_A_salida, self.puerto_A_frame)
-    def actualizar_puerto_B(self):
-        self._actualizar_puerto(self.puerto_B_salida, self.puerto_B_frame)
-    def _actualizar_puerto(self, puerto, frame):
-        # Limpiar el frame
-        for widget in frame.winfo_children():
-            widget.destroy()
-        # Mostrar los barcos de forma horizontal
-        for barco in puerto:
-            barco_label = tk.Label(frame, text=barco, borderwidth=1, relief="solid", padx=5, pady=5)
-            barco_label.pack(side=tk.LEFT, padx=2)
-            self.draw_boat(barco_label, barco)
-        # Línea divisoria
-        line = tk.Label(frame, text="|", padx=2)
-        line.pack(side=tk.LEFT)
-    def actualizar_puerto_A_entrada(self):
-        self._actualizar_puerto(self.puerto_A_entrada, self.puerto_A_entrada_frame)
-    def actualizar_puerto_B_entrada(self):
-        self._actualizar_puerto(self.puerto_B_entrada, self.puerto_B_entrada_frame)
-        
+        # Variable para almacenar el descriptor de archivo del pipe
+        self.pipe_fd = None
+
+        # Iniciar la verificación del pipe en un hilo separado
+        self.start_pipe_check()
+
     def draw_boat(self, label, boat_type):
-        canvas = tk.Canvas(label, width=50, height=30)
-        canvas.pack()
-        # Trapezium for the boat body
-        if boat_type == 'Normal':
-            canvas.create_polygon(10, 20, 20, 30, 40, 30, 50, 20, fill='blue')
-        elif boat_type == 'Patrulla':
-            canvas.create_polygon(10, 20, 20, 30, 40, 30, 50, 20, fill='red')
-        elif boat_type == 'Pesquero':
-            canvas.create_polygon(10, 20, 20, 30, 40, 30, 50, 20, fill='green')
-        # Stick for the mast
-        canvas.create_line(25, 20, 25, 10, fill='black')
-        # Triangle for the flag
-        canvas.create_polygon(30, 10, 25, 15, 25, 5, fill='white')
+        # Dibujar un barco en la etiqueta
+        if boat_type == "Normal":
+            label.config(text="⛴️")
+        elif boat_type == "Patrulla":
+            label.config(text="🚢")
+        elif boat_type == "Pesquero":
+            label.config(text="🎣")
+
+    def actualizar_puerto_A(self):
+        # Actualizar la interfaz gráfica para mostrar los barcos en el puerto A
+        for widget in self.puerto_A_frame.winfo_children():
+            widget.destroy()
+        for boat in self.puerto_A_salida:
+            label = tk.Label(self.puerto_A_frame, text="⛴️")
+            label.pack(side=tk.LEFT, padx=10)
+    
+    def actualizar_puerto_A_entrada(self):
+        # Actualizar la interfaz gráfica para mostrar los barcos en la cola de entrada del puerto A
+        for widget in self.puerto_A_entrada_frame.winfo_children():
+            widget.destroy()
+        for boat in self.puerto_A_entrada:
+            label = tk.Label(self.puerto_A_entrada_frame, text="⛴️")
+            label.pack(side=tk.LEFT, padx=10)
+    
+    def actualizar_puerto_B(self):
+        # Actualizar la interfaz gráfica para mostrar los barcos en el puerto B
+        for widget in self.puerto_B_frame.winfo_children():
+            widget.destroy()
+        for boat in self.puerto_B_salida:
+            label = tk.Label(self.puerto_B_frame, text="🚢")
+            label.pack(side=tk.LEFT, padx=10)
+    
+    def actualizar_puerto_B_entrada(self):
+        # Actualizar la interfaz gráfica para mostrar los barcos en la cola de entrada del puerto B
+        for widget in self.puerto_B_entrada_frame.winfo_children():
+            widget.destroy()
+        for boat in self.puerto_B_entrada:
+            label = tk.Label(self.puerto_B_entrada_frame, text="🚢")
+            label.pack(side=tk.LEFT, padx=10)
+
+    def start_pipe_check(self):
+        # Crear el pipe si no existe
+        try:
+            os.mkfifo('mock_serial_port')
+        except OSError as e:
+            if e.errno != 17:  # Error 17 es "File exists"
+                raise
+
+        # Abrir el pipe en modo bloqueante
+        self.pipe_fd = os.open('mock_serial_port', os.O_RDONLY)
+
+        # Iniciar el chequeo del pipe en un hilo separado
+        threading.Thread(target=self.check_pipe, daemon=True).start()
+
+    def check_pipe(self):
+        while True:
+            self.read_from_pipe()
+            time.sleep(0.1)
+
+    def read_from_pipe(self):
+        try:
+            # Leer hasta 64 bytes (tamaño de la estructura FlowManager)
+            data = os.read(self.pipe_fd, 64)
+            if len(data) == 0:
+                # No hay datos disponibles, no es un error crítico
+                return
+            elif len(data) != 64:
+                print(f"Error: received data size {len(data)} is incorrect")
+                return
+
+            # Desempaquetar los datos recibidos
+            flow_manager = self.unpack_flow_manager(data)
+            # Actualizar la interfaz gráfica con los nuevos datos
+            self.update_gui(flow_manager)
+
+        except OSError as e:
+            if e.errno != 11:  # Errno 11 es "Resource temporarily unavailable", lo ignoramos
+                print(f"Error reading from pipe: {e}")
+        except struct.error as e:
+            print(f"Error unpacking data: {e}")
+
+    def unpack_flow_manager(self, data):
+        # Desempaquetar la estructura FlowManager (15 enteros y 1 flotante)
+        flow_manager = struct.unpack('iiiiiiiiiiiiiiif', data)
+        return {
+            'method': flow_manager[0],
+            'canal_length': flow_manager[1],
+            'current_direction': flow_manager[2],
+            'ships_passed': flow_manager[3],
+            'total_ships_passed': flow_manager[4],
+            'normal_ship_speed': flow_manager[5],
+            'fishing_ship_speed': flow_manager[6],
+            'patrol_ship_speed': flow_manager[7],
+            'ships_in_queue_LR': flow_manager[8],
+            'ships_in_queue_RL': flow_manager[9],
+            'ships_in_midcanal_LR': flow_manager[10],
+            'ships_in_midcanal_RL': flow_manager[11],
+            'ships_in_done_LR': flow_manager[12],
+            'ships_in_done_RL': flow_manager[13],
+            'w_param': flow_manager[14],
+            't_param': flow_manager[15],
+        }
+
+    def update_gui(self, flow_manager):
+        # Actualizar la interfaz gráfica según los datos del FlowManager
+        # Actualizar la cola de entrada del puerto A
+        self.puerto_A_entrada = deque([f"Barco {i+1}" for i in range(flow_manager['ships_in_queue_LR'])])
+        self.actualizar_puerto_A_entrada()
+
+        # Actualizar la cola de entrada del puerto B
+        self.puerto_B_entrada = deque([f"Barco {i+1}" for i in range(flow_manager['ships_in_queue_RL'])])
+        self.actualizar_puerto_B_entrada()
+
+        # Actualizar el canal
+        for i in range(canal_size):
+            if i < flow_manager['ships_in_midcanal_LR']:
+                label = tk.Label(self.canal_labels[i])
+                self.draw_boat(label, "Normal")
+                label.pack()
+            elif i < flow_manager['ships_in_midcanal_LR'] + flow_manager['ships_in_midcanal_RL']:
+                label = tk.Label(self.canal_labels[i])
+                self.draw_boat(label, "Patrulla")
+                label.pack()
+            else:
+                self.canal_labels[i].config(text="Espacio " + str(i + 1))
+
+        # Actualizar la cola de salida del puerto A
+        self.puerto_A_salida = [f"Barco {i+1}" for i in range(flow_manager['ships_in_done_LR'])]
+        self.actualizar_puerto_A()
+
+        # Actualizar la cola de salida del puerto B
+        self.puerto_B_salida = [f"Barco {i+1}" for i in range(flow_manager['ships_in_done_RL'])]
+        self.actualizar_puerto_B()
 
 if __name__ == "__main__":
     root = tk.Tk()
