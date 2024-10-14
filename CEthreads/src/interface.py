@@ -2,9 +2,7 @@ import tkinter as tk
 import struct
 import os
 import time
-import threading
 from collections import deque
-
 # Define constants for the maximum number of ships and the canal size
 MAX_SHIPS = 5  # Maximum number of ships
 CANAL_SIZE = 5  # Size of the canal
@@ -94,7 +92,6 @@ class CanalApp:
         self.method_label.grid(row=4, column=1, padx=10)
         self.scheduler_label = tk.Label(main_frame, text="Tipo de programador:")
         self.scheduler_label.grid(row=5, column=1, padx=10)
-        
 
     def draw_boat(self, label, boat_type, position):
         # Draw a boat in the label
@@ -107,12 +104,11 @@ class CanalApp:
         else:
             label.config(text="")
 
-
     def actualizar_puerto_A(self):
         # Update the UI for Port A Out
         for widget in self.puerto_A_salida_frame.winfo_children():
             widget.destroy()
-    
+
         # Display the boats that are currently leaving Port A
         for i in range(MAX_SHIPS):
             label = tk.Label(self.puerto_A_salida_frame, text="")
@@ -121,12 +117,12 @@ class CanalApp:
                 self.draw_boat(label, self.puerto_A_salida[i][0], self.puerto_A_salida[i][1])
             else:
                 label.config(text="")  # Leave an empty space for departed boats
-    
+
     def actualizar_puerto_A_entrada(self):
         # Update the UI for Port A In
         for widget in self.puerto_A_entrada_frame.winfo_children():
             widget.destroy()
-    
+
         # Display the boats that are currently arriving at Port A
         for i in range(MAX_SHIPS):
             label = tk.Label(self.puerto_A_entrada_frame, text="")
@@ -135,12 +131,12 @@ class CanalApp:
                 self.draw_boat(label, self.puerto_A_entrada[i][0], self.puerto_A_entrada[i][1])
             else:
                 label.config(text="")  # Leave an empty space for unoccupied slots
-    
+
     def actualizar_puerto_B(self):
         # Update the UI for Port B Out
         for widget in self.puerto_B_salida_frame.winfo_children():
             widget.destroy()
-    
+
         # Display the boats that are currently leaving Port B
         for i in range(MAX_SHIPS):
             label = tk.Label(self.puerto_B_salida_frame, text="")
@@ -149,12 +145,12 @@ class CanalApp:
                 self.draw_boat(label, self.puerto_B_salida[i][0], self.puerto_B_salida[i][1])
             else:
                 label.config(text="")  # Leave an empty space for departed boats
-    
+
     def actualizar_puerto_B_entrada(self):
         # Update the UI for Port B In
         for widget in self.puerto_B_entrada_frame.winfo_children():
             widget.destroy()
-    
+
         # Display the boats that are currently arriving at Port B
         for i in range(MAX_SHIPS):
             label = tk.Label(self.puerto_B_entrada_frame, text="")
@@ -163,6 +159,7 @@ class CanalApp:
                 self.draw_boat(label, self.puerto_B_entrada[i][0], self.puerto_B_entrada[i][1])
             else:
                 label.config(text="")  # Leave an empty space for unoccupied slots
+
     def start_pipe_check(self):
         # Create the pipe if it doesn't exist
         try:
@@ -174,13 +171,13 @@ class CanalApp:
         # Open the pipe in blocking mode
         self.pipe_fd = os.open('mock_serial_port', os.O_RDONLY)
 
-        # Start checking the pipe in a separate thread
-        threading.Thread(target=self.check_pipe, daemon=True).start()
+        # Start checking the pipe periodically
+        self.check_pipe()
 
     def check_pipe(self):
-        while True:
-            self.read_from_pipe()
-            time.sleep(0.1)
+        self.read_from_pipe()
+        # Schedule the next check
+        self.root.after(100, self.check_pipe)
 
     def read_from_pipe(self):
         try:
@@ -199,8 +196,40 @@ class CanalApp:
             # Unpack the received data
             interface_data = struct.unpack(INTERFACE_DATA_FORMAT, data)
 
-            # Thread-safe UI update
-            self.root.after(0, self.update_gui, interface_data)
+            # Update UI components based on the received data
+            self.canal_length_label.config(text=f"Longitud del canal: {interface_data[MAX_SHIPS * 10]}")
+            self.actual_direction_label.config(text=f"Dirección actual: {'L->R' if interface_data[MAX_SHIPS * 10 + 1] == 0 else ' R->L'}")
+
+            # Map method and scheduler to their corresponding names
+            method_names = {0: "EQUITY", 1: "SIGN", 2: "SIGN"}
+            scheduler_names = {0: "ROUND_ROBIN", 1: "PRIORITY", 2: "SJF", 3: "FCFS", 4: "REAL_TIME"}
+
+            self.method_label.config(text=f"Método de flujo: {method_names.get(interface_data[MAX_SHIPS * 10 + 2], 'Unknown')}")
+            self.scheduler_label.config(text=f"Tipo de programador: {scheduler_names.get(interface_data[MAX_SHIPS * 10 + 3], 'Unknown')}")
+
+            # Update ports
+            self.puerto_A_salida = deque([(interface_data[i], interface_data[i+1]) for i in range(0, MAX_SHIPS*2, 2)])
+            self.puerto_A_entrada = deque([(interface_data[MAX_SHIPS*2 + i], interface_data[MAX_SHIPS*2 + i+1]) for i in range(0, MAX_SHIPS*2, 2)])
+            self.puerto_B_salida = deque([(interface_data[MAX_SHIPS*4 + i], interface_data[MAX_SHIPS*4 + i+1]) for i in range(0, MAX_SHIPS*2, 2)])
+            self.puerto_B_entrada = deque([(interface_data[MAX_SHIPS*6 + i], interface_data[MAX_SHIPS*6 + i+1]) for i in range(0, MAX_SHIPS*2, 2)])
+
+            self.actualizar_puerto_A()
+            self.actualizar_puerto_A_entrada()
+            self.actualizar_puerto_B()
+            self.actualizar_puerto_B_entrada()
+
+            # Update canal
+            midcanal_ships = []
+            for i in range(0, len(interface_data[MAX_SHIPS*8:MAX_SHIPS*10]), 2):
+                if 0 < interface_data[MAX_SHIPS*8 + i+1] < interface_data[MAX_SHIPS * 10]:  # Only consider ships that are actually in the canal
+                    midcanal_ships.append((interface_data[MAX_SHIPS*8 + i], interface_data[MAX_SHIPS*8 + i+1]))
+            midcanal_ships.sort(key=lambda x: x[1] if interface_data[MAX_SHIPS * 10 + 1] == 0 else -x[1])  # Sort ships based on direction
+
+            for i in range(CANAL_SIZE):
+                if i < len(midcanal_ships):
+                    self.draw_boat(self.canal_labels[i], midcanal_ships[i][0], midcanal_ships[i][1])
+                else:
+                    self.canal_labels[i].config(text="Espacio " + str(i + 1))
 
         except OSError as e:
             if e.errno != 11:  # Errno 11 is "Resource temporarily unavailable", ignore it
@@ -209,56 +238,8 @@ class CanalApp:
         except struct.error as e:
             print(f"Error unpacking data: {e}")
 
-    def update_gui(self, interface_data):
-        # Extract the different data components from interface_data tuple
-        queue_LR_data = interface_data[:MAX_SHIPS * 2]
-        queue_RL_data = interface_data[MAX_SHIPS * 2:MAX_SHIPS * 4]
-        midcanal_data = interface_data[MAX_SHIPS * 4:MAX_SHIPS * 6]
-        done_LR_ships = interface_data[MAX_SHIPS * 6:MAX_SHIPS * 8]
-        done_RL_ships = interface_data[MAX_SHIPS * 8:MAX_SHIPS * 10]
-        canal_length = interface_data[MAX_SHIPS * 10]
-        actual_direction = interface_data[MAX_SHIPS * 10 + 1]
-        method = interface_data[MAX_SHIPS * 10 + 2]
-        scheduler = interface_data[MAX_SHIPS * 10 + 3]
-        
-        # Update UI components based on the received data
-        self.canal_length_label.config(text=f"Longitud del canal: {canal_length}")
-        self.actual_direction_label.config(text=f"Dirección actual: {'L->R' if actual_direction == 0 else 'R->L'}")
-        
-        # Map method and scheduler to their corresponding names
-        method_names = {0: "EQUITY", 1: "SIGN", 2: "SIGN"}
-        scheduler_names = {0: "ROUND_ROBIN", 1: "PRIORITY", 2: "SJF", 3: "FCFS", 4: "REAL_TIME"}
-        
-        self.method_label.config(text=f"Método de flujo: {method_names.get(method, 'Unknown')}")
-        self.scheduler_label.config(text=f"Tipo de programador: {scheduler_names.get(scheduler, 'Unknown')}")
-        
-        # Update ports
-        self.puerto_A_salida = deque([(queue_LR_data[i], queue_LR_data[i+1]) for i in range(0, MAX_SHIPS*2, 2)])
-        self.puerto_A_entrada = deque([(done_LR_ships[i], done_LR_ships[i+1]) for i in range(0, MAX_SHIPS*2, 2)])
-        self.puerto_B_salida = deque([(queue_RL_data[i], queue_RL_data[i+1]) for i in range(0, MAX_SHIPS*2, 2)])
-        self.puerto_B_entrada = deque([(done_RL_ships[i], done_RL_ships[i+1]) for i in range(0, MAX_SHIPS*2, 2)])
-        
-        self.actualizar_puerto_A()
-        self.actualizar_puerto_A_entrada()
-        self.actualizar_puerto_B()
-        self.actualizar_puerto_B_entrada()
-        
-        # Update canal
-        midcanal_ships = []
-        for i in range(0, len(midcanal_data), 2):
-            if 0 < midcanal_data[i+1] < canal_length:  # Only consider ships that are actually in the canal
-                midcanal_ships.append((midcanal_data[i], midcanal_data[i+1]))
-        midcanal_ships.sort(key=lambda x: x[1] if actual_direction == 0 else -x[1])  # Sort ships based on direction
-        
-        for i in range(CANAL_SIZE):
-            if i < len(midcanal_ships):
-                self.draw_boat(self.canal_labels[i], midcanal_ships[i][0], midcanal_ships[i][1])
-            else:
-                self.canal_labels[i].config(text="Espacio " + str(i + 1))
-    
 
 if __name__ == "__main__":
     root = tk.Tk()
     app = CanalApp(root)
     root.mainloop()
-
