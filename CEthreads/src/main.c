@@ -19,7 +19,8 @@
 #include "flow_manager.h"
 
 
-#define MAX_SHIPS 100
+#define MAX_SHIPS 10
+#define BASE_TIME 1000000
 
 /* ----------------------------- Configuration      variables ----------------------------- */
 
@@ -162,6 +163,32 @@ void load_configuration(const char* filename) {
     fclose(file);
 }
 
+
+/*
+ * Creates and sets up the serial port
+ */
+void serial_setup() {
+
+    // Creates the  serial port
+    printf("\nCreates and sets up the serial ports for the first and only time...\n");
+
+    /**/
+    //flow_manager.interface_serial_port = open("mock_serial_port", O_RDWR);
+    if (flow_manager.interface_serial_port == -1) {
+        perror("Unable to open mock serial port");
+    }
+    /**/
+
+   /**/
+    //flow_manager.hardware_serial_port = open("mock_serial_port", O_RDWR);
+    if (flow_manager.hardware_serial_port == -1) {
+        perror("Unable to open mock serial port");
+    }
+    /**/
+
+}
+
+
 /*
  * Alista el canal
  */
@@ -205,7 +232,7 @@ void ready_up_canal(){
     // Crea hilo para el flow_manager
     pthread_create(&canal_thread, NULL, manage_canal, &flow_manager);
 
-    usleep(1000000);
+    usleep(BASE_TIME);
 
     printf("\nOpening canal...\n");
     // Ships are now allowed to flow
@@ -483,39 +510,20 @@ int main(int argc, char *argv[]) {
     }
 
 
+    // Configura el puerto serial y su comunicacion
+    serial_setup();
+
     // Alista el canal inicializando los mutexes
     ready_up_canal();
 
     // Alista los barcos creando los threads
     ready_up_ships();
 
+    // Verificara cuando se agreguen nuevos barcos por medio del teclado
+    //manage_new_ships(); /* Check if new ships have been added */
+
     // Cierra el canal
     close_canal();
-
-    
-    /* --------------------------------- Testing simulations --------------------------------- */
-
-    /* main program cycle */
-    while (canal_is_open) {
-
-        /* Send actual state of program*/
-        send_state();
-
-        /* Schedule ships */
-        //schedule();
-
-        /* Make ships flow */
-        // flow();
-
-        /* Check if new ships have been added */
-        manage_new_ships();
-
-        // Solo para testing y que termine el programa mientras
-        if (ship_count > 9)
-            canal_is_open = 0;
-    }
-
-    /* --------------------------------------------------------------------------------------- */
 
     return 0;
 }

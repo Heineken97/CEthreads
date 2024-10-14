@@ -5,13 +5,13 @@
 #ifndef FLOW_MANAGER_H
 #define FLOW_MANAGER_H
 
-
+#include <time.h>
 // #include "CEthreads.h"
 #include <pthread.h>
 #include "ship.h"
 #include "schedulers.h"
 
-#define MAX_SHIPS 100
+#define MAX_SHIPS 10
 #define MAX_LENGTH 100
 
 // Definición del enum para los métodos de flujo
@@ -25,6 +25,11 @@ typedef enum {
 // Structure that represents a flow manager
 typedef struct {
 
+    // 
+    int interface_serial_port;      // Descriptor de archivo para el puerto serial de la interfaz
+    //
+    int hardware_serial_port;       // Descriptor de archivo para el puerto serial del hardware
+    //
     SchedulerType scheduler;        // Calendarizador que ordenara los Ships
     // Initialized in load_configuration(filename) @ main.c
     FlowMethod method;              // Metodo por el cual se regira el programa
@@ -40,6 +45,8 @@ typedef struct {
     pthread_mutex_t canal_spaces[MAX_LENGTH];   // Mutexes para cada espacio del canal
     // Initialized in ready_up_canal() @ main.c
     int space_state[MAX_LENGTH];    // Estado de los espacios del canal: 0 = libre, 1 = ocupado
+    //
+    int space_state_RL[MAX_LENGTH];    // Estado de los espacios del canal: 0 = libre, 1 = ocupado
     /* Ship's speeds*/
     // Initialized in load_configuration(filename) @ main.c
     int normal_ship_speed;          // Velocidad del Normal Ship
@@ -48,11 +55,11 @@ typedef struct {
     // Initialized in load_configuration(filename) @ main.c
     int patrol_ship_speed;          // Velocidad del Patrol Ship
     /* Arrays of Ships */
+    // Initialized in ready_up_canal() @ main.c
+    pthread_mutex_t ship_queues;
     // Initialized in load_configuration(filename) @ main.c
     int ships_in_queue_LR;          // Cantidad de Ships en queue_LR
     Ship queue_LR[MAX_SHIPS];       // Array de Ships en cola (Izq -> Der)
-    // Initialized in ready_up_canal() @ main.c
-    pthread_mutex_t ship_queues;
     // Initialized in load_configuration(filename) @ main.c
     int ships_in_queue_RL;          // Cantidad de Ships en queue_RL
     Ship queue_RL[MAX_SHIPS];       // Array de Ships en cola (Der -> Izq)
@@ -80,9 +87,33 @@ typedef struct {
     int ships_for_cycle_ready;
     /* SIGN */
     // Initialized in load_configuration(filename) @ main.c
-    float t_param;                  // Cantidad de tiempo que pasa antes de alternar la direccion    
+    float t_param;                  // Cantidad de tiempo que pasa antes de alternar la direccion
+    //
+    time_t sign_start_time;         // Hora de inicio del ciclo de sign
+    //
+    int ships_still_going[MAX_SHIPS];   // Ids de Ships que estan midcanal y no han terminado de pasar
+    // 
+    int ships_through[MAX_SHIPS];   // Ids de Ships que completaron el canal este ciclo
 
 } FlowManager;
+
+// Structure for interface data (destination 0)
+typedef struct {
+    SimpleShip queue_LR_data[MAX_SHIPS];        // Ships in queue LR scheduled
+    SimpleShip queue_RL_data[MAX_SHIPS];        // Ships in queue RL scheduled
+    SimpleShip midcanal_data[MAX_SHIPS];        // Ships in midcanal (current direction only)
+    SimpleShip done_LR_ships[MAX_SHIPS];        // Completed ships in LR
+    SimpleShip done_RL_ships[MAX_SHIPS];        // Completed ships in RL
+    int canal_length;                           // Length of the canal
+    int actual_direction;                       // Current direction
+    FlowMethod method;                          // Flow control method (int)
+    SchedulerType scheduler;                    // Scheduling algorithm (int)
+} InterfaceData;
+
+// Structure for hardware data (destination 1)
+typedef struct {
+    SimpleShip not_done_data[MAX_SHIPS];        // Queue and midcanal data
+} HardwareData;
 
 // Declaraciones de funciones para cada método de flujo
 void equity_flow(int W);                // Método de flujo: Equidad
@@ -91,6 +122,12 @@ void tico_flow();                       // Método de flujo: Tico
 
 // Función para convertir un string a FlowMethod
 FlowMethod get_flow_method(const char* method_name);
+
+// Saves the current time
+void start_timer(time_t* start_time);
+
+// Checks if the specified time interval has elapsed
+int has_time_elapsed(time_t start_time, float interval) ;
 
 // Function that gets how many ships are yet to cross
 int get_ships_yet_to_cross(FlowManager* flow_manager);
@@ -104,10 +141,19 @@ void move_ships_to_done(FlowManager* flow_manager);
 // Defines the quantity of ships to complete their journey this cycle
 int get_ships_on_cycle(FlowManager* flow_manager);
 
+// Transmits data via serial ports
+void transmit_canal_data(FlowManager* flow_manager, int destination);
+
 // Function that determines if the ship is allowed to advance 
-int ship_can_advance(Ship* ship, FlowManager* flow_manager);
+int ship_can_advance(Ship** ship, FlowManager* flow_manager);
 
 // Checks if ship is next on the canal
-int ship_is_next(Ship* ship, FlowManager* flow_manager);
+int ship_is_next(Ship** ship, FlowManager* flow_manager);
+
+// Determines if ship is mid-canal or needs to be moved to it 
+int ship_is_midcanal(Ship** ship, FlowManager* flow_manager);
+
+// Function completes the journey of a ship through the canal
+void end_sail(Ship** ship, FlowManager* flow_manager);
 
 #endif // FLOW_MANAGER_H

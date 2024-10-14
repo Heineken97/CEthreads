@@ -10,7 +10,7 @@
 #include "schedulers.h"
 #include "ship.h"
 
-#define MAX_SHIPS 100
+#define MAX_SHIPS 10
 
 // Round Robin Scheduler
 void round_robin_scheduler(Ship ships[], int scheduled_ids[]) {
@@ -143,7 +143,7 @@ void test_schedule(Ship ships[], int scheduled_ids[]) {
 
     // Iterate over the ships array
     for (int i = 0; i < MAX_SHIPS; i++) {
-        if (ships[i].position == 0) {
+        if (ships[i].position <= 1 && ships[i].id != 0) {
             scheduled_ids[index] = ships[i].id;  // Add ship ID to the array
             index++;
         }

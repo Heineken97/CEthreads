@@ -110,13 +110,20 @@ void* move_ship(void* arg) {
     FlowManager* flow_manager = context->flow_manager;
     int next_position;
 
+    // int actual_ship_id = ship->id;
+
     while (ship->position < flow_manager->canal_length) {
 
+        // Simular el tiempo que tarda en moverse según la velocidad
+        usleep(BASE_TIME / ship->speed);  // Esperar en microsegundos (según la velocidad)
+
         // Verificar si el barco puede avanzar
-        while (!ship_can_advance(ship, flow_manager)) {
+        while (!ship_can_advance(&ship, flow_manager)) {
             printf("Barco %d esperando permiso para avanzar.\n", ship->id);
             usleep(BASE_TIME / ship->speed);  // Esperar antes de volver a verificar
         }
+
+
 
         // Gets the position that the Ship is trying to access
         next_position = ship->position + 1;
@@ -124,53 +131,119 @@ void* move_ship(void* arg) {
         // Intentar moverse al siguiente espacio
         pthread_mutex_lock(&flow_manager->canal_spaces[next_position]); // Bloquea el mutex
 
-        // Verifica si el espacio está libre
-        if (flow_manager->space_state[next_position] == 0) {
+        // Si la direccion es igual a 0 (I->D)
+        if (flow_manager->current_direction == 0) {
 
-            // Como no hay Ships en este, ocupa el espacio
-            flow_manager->space_state[next_position] = 1;
-            printf("Barco %d ocupando la posición %d\n", ship->id, next_position);
-            pthread_mutex_unlock(&flow_manager->canal_spaces[next_position]);   // Desbloquea el mutex
+            // Verifica si el espacio está libre
+            if (flow_manager->space_state[next_position] == 0) {
 
-            // Actualiza la posicion del struct del Ship
-            ship->position = next_position;
+                // Como no hay Ships en este, ocupa el espacio
+                flow_manager->space_state[next_position] = 1;
+                printf("Barco %d ocupando la posición %d en direccion %d\n",
+                        ship->id, next_position, flow_manager->current_direction);
+                pthread_mutex_unlock(&flow_manager->canal_spaces[next_position]);   // Desbloquea el mutex
 
-            // Liberar el espacio anterior
-            if (ship->position > 1) {
-                pthread_mutex_lock(&flow_manager->canal_spaces[ship->position - 1]);
-                flow_manager->space_state[ship->position - 1] = 0;  // Liberar el espacio anterior
-                printf("Barco %d liberando la posición %d\n", ship->id, ship->position - 1);
-                pthread_mutex_unlock(&flow_manager->canal_spaces[ship->position - 1]);
+                // Actualiza la posicion del struct del Ship
+                ship->position = next_position;
+
+                // Liberar el espacio anterior
+                if (ship->position > 1) {
+                    pthread_mutex_lock(&flow_manager->canal_spaces[ship->position - 1]);
+                    flow_manager->space_state[ship->position - 1] = 0;  // Liberar el espacio anterior
+                    printf("Barco %d liberando la posición %d en direccion %d\n",
+                            ship->id, ship->position - 1, flow_manager->current_direction);
+                    pthread_mutex_unlock(&flow_manager->canal_spaces[ship->position - 1]);
+                }
+
+            } else {
+                // Si el espacio está ocupado, liberar el mutex y esperar antes de intentar de nuevo
+                pthread_mutex_unlock(&flow_manager->canal_spaces[next_position]);
+                printf("Barco %d esperando la posición %d en direccion %d\n",
+                        ship->id, next_position, flow_manager->current_direction);
             }
 
-            // Simular el tiempo que tarda en moverse según la velocidad
-            usleep(BASE_TIME / ship->speed);  // Esperar en microsegundos (según la velocidad)
-            
-        } else {
-            // Si el espacio está ocupado, liberar el mutex y esperar antes de intentar de nuevo
-            pthread_mutex_unlock(&flow_manager->canal_spaces[next_position]);
-            printf("Barco %d esperando la posición %d\n", ship->id, next_position);
-            usleep(BASE_TIME / ship->speed);  // Esperar antes de volver a intentar (segun la velocidad)
         }
+        // Si la direccion es igual a 1 (D->I)
+        else if (flow_manager->current_direction == 1) {
+
+            // Verifica si el espacio está libre
+            if (flow_manager->space_state_RL[next_position] == 0) {
+
+                // Como no hay Ships en este, ocupa el espacio
+                flow_manager->space_state_RL[next_position] = 1;
+                printf("Barco %d ocupando la posición %d en direccion %d\n",
+                        ship->id, next_position, flow_manager->current_direction);
+                pthread_mutex_unlock(&flow_manager->canal_spaces[next_position]);   // Desbloquea el mutex
+
+                // Actualiza la posicion del struct del Ship
+                ship->position = next_position;
+
+                // Liberar el espacio anterior
+                if (ship->position > 1) {
+                    pthread_mutex_lock(&flow_manager->canal_spaces[ship->position - 1]);
+                    flow_manager->space_state_RL[ship->position - 1] = 0;  // Liberar el espacio anterior
+                    printf("Barco %d liberando la posición %d en direccion %d\n",
+                            ship->id, ship->position - 1, flow_manager->current_direction);
+                    pthread_mutex_unlock(&flow_manager->canal_spaces[ship->position - 1]);
+                }
+
+            } else {
+                // Si el espacio está ocupado, liberar el mutex y esperar antes de intentar de nuevo
+                pthread_mutex_unlock(&flow_manager->canal_spaces[next_position]);
+                printf("Barco %d esperando la posición %d en direccion %d\n",
+                        ship->id, next_position, flow_manager->current_direction);
+            }
+
+        }
+        // Error en la direccion
+        else {
+            pthread_mutex_unlock(&flow_manager->canal_spaces[next_position]);
+            printf("ERROR @ ship.c (move_ship): undefined flow_manager->current_direction @ first ifs\n");
+            return 0;
+        }
+
     }
 
+
     // Desbloquear el último mutex cuando el barco termine su recorrido
-    if (ship->position >= flow_manager->canal_length) {
+    // if (ship->position >= flow_manager->canal_length) {
+
+
+    // Si la direccion es igual a 0 (I->D)
+    if (flow_manager->current_direction == 0) {
+
         // Libera la posicion en la que está
         pthread_mutex_lock(&flow_manager->canal_spaces[ship->position]);
         flow_manager->space_state[ship->position] = 0;  // Liberar el último espacio
-        printf("Barco %d liberando la posición %d\n", ship->id, ship->position);
+        printf("Barco %d liberando la posición %d en direccion %d\n",
+                ship->id, ship->position, flow_manager->current_direction);
         pthread_mutex_unlock(&flow_manager->canal_spaces[ship->position]);
+
+    }
+    // Si la direccion es igual a 1 (D->I)
+    else if (flow_manager->current_direction == 1) {
+
+        // Libera la posicion en la que está
+        pthread_mutex_lock(&flow_manager->canal_spaces[ship->position]);
+        flow_manager->space_state_RL[ship->position] = 0;  // Liberar el último espacio
+        printf("Barco %d liberando la posición %d en direccion %d\n",
+                ship->id, ship->position, flow_manager->current_direction);
+        pthread_mutex_unlock(&flow_manager->canal_spaces[ship->position]);
+
+    }
+    // Error en la direccion
+    else {
+
+        printf("ERROR @ ship.c (move_ship): undefined flow_manager->current_direction @ first ifs\n");
+        return 0;
     }
 
+
     // Terminar recorrido
-    printf("Barco %d ha completado su recorrido por el canal.\n", ship->id);
-
-    // aumentar: ships_passed
-    flow_manager->ships_passed_this_cycle++;
-
-    // aumentar: total_ships_passed
-    flow_manager->total_ships_passed++; 
+    
+    pthread_mutex_lock(&flow_manager->ship_queues);  // Bloquea el mutex
+    end_sail(&ship, flow_manager);
+    pthread_mutex_unlock(&flow_manager->ship_queues);   // Desbloquea el mutex
 
     return NULL;
 }

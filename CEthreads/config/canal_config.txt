@@ -33,4 +33,4 @@ w_param: 2
 
 # Tiempo de cambio del letrero
 # (en segundos, solo aplica si se usa el método de control "SIGN")
-t_param: 6.9
+t_param: 7.0
