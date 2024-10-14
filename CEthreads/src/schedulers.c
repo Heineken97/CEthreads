@@ -34,7 +34,7 @@ void round_robin_scheduler(Ship ships[], int scheduled_ids[]) {
 }
 
 // Function to simulate Round Robin scheduling
-void round_robin_scheduler(Ship ships[], int ship_count, int time_quantum) {
+void round_robin_scheduler_(Ship ships[], int ship_count, int time_quantum) {
     int total_time = 0;
     int completed = 0;
     float remaining_time[ship_count];
@@ -87,7 +87,7 @@ void priority_scheduler(Ship ships[], int scheduled_ids[]) {
 }
 
 // Function to sort ships using the Priority algorithm
-void priority_scheduler(Ship ships[], int ship_count) {
+void priority_scheduler_(Ship ships[], int ship_count) {
     // Sort ships based on priority (higher value has higher priority)
     for (int i = 0; i < ship_count - 1; i++) {
         for (int j = i + 1; j < ship_count; j++) {
@@ -138,7 +138,7 @@ void sjf_scheduler(Ship ships[], int scheduled_ids[]) {
 }
 
 // Function to simulate Shortest Job First (SJF) scheduling
-void sjf_scheduler(Ship ships[], int ship_count) {
+void sjf_scheduler_(Ship ships[], int ship_count) {
     printf("Before sorting:\n");
     for (int i = 0; i < ship_count; i++) {
         printf("Ship ID: %d, Processing Time: %.2f\n", ships[i].id, ships[i].processing_time);
@@ -185,7 +185,7 @@ void fcfs_scheduler(Ship ships[], int scheduled_ids[]) {
 }
 
 // Function to simulate First Come First Serve (FCFS) scheduling
-void fcfs_scheduler(Ship ships[], int ship_count) {
+void fcfs_scheduler_(Ship ships[], int ship_count) {
     float total_time = 0;
     printf("FCFS scheduler:\n");
     for (int i = 0; i < ship_count; i++) {
@@ -221,7 +221,7 @@ void real_time_scheduler(Ship ships[], int scheduled_ids[], float max_time) {
 }
 
 // Function to simulate Real Time scheduler
-void real_time_scheduler(Ship ships[], int ship_count, float time_slice) {
+void real_time_scheduler_(Ship ships[], int ship_count, float time_slice) {
     printf("Real Time scheduler:\n");
     float total_time = 0;
     for (int i = 0; i < ship_count; i++) {

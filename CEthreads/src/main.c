@@ -157,7 +157,9 @@ void load_configuration(const char* filename) {
                 new_ship = create_ship(ship_count+1, type, direction, speed);
                 // Almacena el Ship en el array correspondiente asignando el valor al que apunta new_ship
                 flow_manager.queue_RL[temp_pos] = *new_ship;
-                // Aumenta la cantidad en la lista a#include <termios.h>
+                // Aumenta la cantidad en la lista al haberlo agregado
+                flow_manager.ships_in_queue_RL++;
+                // Prints total ships in queue_RL
             }
 
             ship_count++;  // Incrementar el contador total de barcos
@@ -167,6 +169,21 @@ void load_configuration(const char* filename) {
     printf("Ships in queue_RL = %d\n", flow_manager.ships_in_queue_RL);
 
     fclose(file);
+}
+
+int configure_serial_port(int fd) {
+    struct termios options;
+    tcgetattr(fd, &options);
+    cfsetispeed(&options, BAUD_RATE);
+    cfsetospeed(&options, BAUD_RATE);
+    options.c_cflag |= (CLOCAL | CREAD);    // Ignorar líneas de control de módem
+    options.c_cflag &= ~PARENB;              // Sin paridad
+    options.c_cflag &= ~CSTOPB;              // 1 bit de parada
+    options.c_cflag &= ~CSIZE;               // Limpiar la máscara de tamaño actual
+    options.c_cflag |= CS8;                   // 8 bits de datos
+    options.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG); // Entrada sin procesar
+    tcsetattr(fd, TCSANOW, &options);
+    return 0;
 }
 
 /*
@@ -196,20 +213,6 @@ int serial_setup() {
     return flow_manager.hardware_serial_port;
 }
 
-
-void configure_serial_port(int fd) {
-    struct termios options;
-    tcgetattr(fd, &options);
-    cfsetispeed(&options, BAUD_RATE);
-    cfsetospeed(&options, BAUD_RATE);
-    options.c_cflag |= (CLOCAL | CREAD);    // Ignorar líneas de control de módem
-    options.c_cflag &= ~PARENB;              // Sin paridad
-    options.c_cflag &= ~CSTOPB;              // 1 bit de parada
-    options.c_cflag &= ~CSIZE;               // Limpiar la máscara de tamaño actual
-    options.c_cflag |= CS8;                   // 8 bits de datos
-    options.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG); // Entrada sin procesar
-    tcsetattr(fd, TCSANOW, &options);
-}
 
 /*
  * Alista el canal
@@ -455,7 +458,7 @@ void manage_new_ship(int type, int direction) {
     // Agrega el Ship a su respectivo array
     if (direction == 0) {
         // Obtiene la cantidad de barcos en la lista para saber su posicion
-        temp_pos = flow_manager.ships_in_queue_LR;
+        temp_pos = ship_count;
         // Crea un nuevo Ship y se referencia con este puntero
         new_ship = create_ship(temp_pos+1, ship_type, direction, speed);
         // Almacena el Ship en el array correspondiente asignando el valor al que apunta new_ship
@@ -467,7 +470,7 @@ void manage_new_ship(int type, int direction) {
     }
     else if (direction == 1) {
         // Obtiene la cantidad de barcos en la lista para saber su posicion
-        temp_pos = flow_manager.ships_in_queue_RL;
+        temp_pos = ship_count;
         // Crea un nuevo Ship y se referencia con este puntero
         new_ship = create_ship(temp_pos+1, ship_type, direction, speed);
         // Almacena el Ship en el array correspondiente asignando el valor al que apunta new_ship

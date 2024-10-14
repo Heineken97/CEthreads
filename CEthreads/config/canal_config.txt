@@ -21,10 +21,10 @@ patrol_speed: 3
 # Tipo: NORMAL, FISHING, PATROL
 # Dirección: 0 (Izq -> Der), 1 (Der -> Izq)
 ship(NORMAL,0)
-ship(NORMAL,0)
+ship(NORMAL,1)
 ship(NORMAL,0)
 ship(NORMAL,1)
-ship(NORMAL,1)
+ship(NORMAL,0)
 ship(NORMAL,1)
 
 # Parámetro W para el control de flujo de equidad
@@ -33,4 +33,4 @@ w_param: 2
 
 # Tiempo de cambio del letrero
 # (en segundos, solo aplica si se usa el método de control "SIGN")
-t_param: 6.9
+t_param: 7.0
