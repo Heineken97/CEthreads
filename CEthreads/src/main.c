@@ -12,6 +12,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <termios.h>
+#include <fcntl.h>
 
 //#include "CEthreads.h"
 #include "ship.h"
@@ -34,6 +36,9 @@ FlowManager flow_manager;
 
 // Crear el hilo para gestionar el canal
 pthread_t canal_thread;
+
+//
+pthread_t key_thread;
 
 /* ---------------------------------------------------------------------------------------- */
 
@@ -148,9 +153,7 @@ void load_configuration(const char* filename) {
                 new_ship = create_ship(ship_count+1, type, direction, speed);
                 // Almacena el Ship en el array correspondiente asignando el valor al que apunta new_ship
                 flow_manager.queue_RL[temp_pos] = *new_ship;
-                // Aumenta la cantidad en la lista al haberlo agregado
-                flow_manager.ships_in_queue_RL++;
-                // Prints total ships in queue_RL  
+                // Aumenta la cantidad en la lista a#include <termios.h>
             }
 
             ship_count++;  // Incrementar el contador total de barcos
@@ -171,7 +174,7 @@ void serial_setup() {
     printf("\nCreates and sets up the serial ports for the first and only time...\n");
 
     /**/
-    //flow_manager.interface_serial_port = open("mock_serial_port", O_RDWR);
+    flow_manager.interface_serial_port = open("mock_serial_port", O_RDWR);
     if (flow_manager.interface_serial_port == -1) {
         perror("Unable to open mock serial port");
     }
@@ -378,36 +381,39 @@ void send_state() {
     
 }
 
+
+
+
+// Configurar la terminal en modo sin buffer
+void enable_raw_mode() {
+    struct termios tty;
+    tcgetattr(STDIN_FILENO, &tty);
+    tty.c_lflag &= ~(ICANON | ECHO);
+    tcsetattr(STDIN_FILENO, TCSANOW, &tty);
+}
+
+// Restaurar la terminal al modo normal
+void disable_raw_mode() {
+    struct termios tty;
+    tcgetattr(STDIN_FILENO, &tty);
+    tty.c_lflag |= (ICANON | ECHO);
+    tcsetattr(STDIN_FILENO, TCSANOW, &tty);
+}
+
+
+
 /*
- * Function: manage_new_ships
- * --------------------------
- * Simulates the addition of new ships by creating a new ship with random attributes and adding
- * it to the ships array.
- * 
- * Notes:
- * - The new ship is assigned an ID, type, direction, and speed. The type and direction are
- *   chosen randomly.
- * - The speed is determined based on the ship's type (NORMAL, FISHING, PATROL).
- * - The ship is added to the ships array, and the ship count is incremented.
- * - The position and priority of the new ship are initialized to default values (0 and -1
- *   respectively).
- * - For now, this function simulates adding ships, but in the future, it will obtain input from
- *   an interface (via key presses) to add new ships.
- */
-void manage_new_ships() {
+*/
+void manage_new_ship(int type, int direction) {
     
     printf("\nSimulating adding new ship...\n");
 
     // Asignar un tipo de barco aleatorio
-    int random_type = rand() % 3;  // Valores entre 0 y 2
-    ShipType random_ShipType = (ShipType)random_type;
-
-    // Asignar una dirección aleatoria (0 o 1)
-    int random_direction = rand() % 2;
+    ShipType ship_type = (ShipType)type;
 
     // Asignar la velocidad correspondiente al tipo de barco
     int speed;
-    switch (random_ShipType) {
+    switch (ship_type) {
         case NORMAL:
             speed = flow_manager.normal_ship_speed;
             break;
@@ -422,12 +428,14 @@ void manage_new_ships() {
     int temp_pos;
     Ship* new_ship;
 
+    pthread_mutex_lock(&flow_manager.ship_queues);
+
     // Agrega el Ship a su respectivo array
-    if (random_direction == 0) {
+    if (direction == 0) {
         // Obtiene la cantidad de barcos en la lista para saber su posicion
         temp_pos = flow_manager.ships_in_queue_LR;
         // Crea un nuevo Ship y se referencia con este puntero
-        new_ship = create_ship(temp_pos+1, random_ShipType, random_direction, speed);
+        new_ship = create_ship(temp_pos+1, ship_type, direction, speed);
         // Almacena el Ship en el array correspondiente asignando el valor al que apunta new_ship
         flow_manager.queue_LR[temp_pos] = *new_ship;
         // Aumenta la cantidad en la lista al haberlo agregado
@@ -435,27 +443,84 @@ void manage_new_ships() {
         // Prints total ships in queue_LR
         printf("Ships in queue_LR = %d\n", flow_manager.ships_in_queue_LR);
     }
-    else if (random_direction == 1) {
+    else if (direction == 1) {
         // Obtiene la cantidad de barcos en la lista para saber su posicion
         temp_pos = flow_manager.ships_in_queue_RL;
         // Crea un nuevo Ship y se referencia con este puntero
-        new_ship = create_ship(temp_pos+1, random_ShipType, random_direction, speed);
+        new_ship = create_ship(temp_pos+1, ship_type, direction, speed);
         // Almacena el Ship en el array correspondiente asignando el valor al que apunta new_ship
         flow_manager.queue_RL[temp_pos] = *new_ship;
         // Aumenta la cantidad en la lista al haberlo agregado
         flow_manager.ships_in_queue_RL++;
         // Prints total ships in queue_RL
         printf("Ships in queue_RL = %d\n", flow_manager.ships_in_queue_RL);
-    }
+    } 
 
     ship_count++;  // Incrementar el contador total de barcos
+
+    pthread_mutex_unlock(&flow_manager.ship_queues); 
+}
+
+
+// Función para escuchar las teclas en un hilo separado
+void* listen_for_keys(void* arg) {
+    enable_raw_mode();
+    printf("Press 'a', 's', 'd', 'z', 'x', or 'c' to create a ship. Press 'q' to quit.\n");
+
+    char input;
+
+    while (1) {
+        input = getchar();
+
+        switch (input) {
+            case 'a':
+                manage_new_ship(0, 0);  // Ship tipo NORMAL, direccion LR
+                break;
+            case 's':
+                manage_new_ship(1, 0);  // Ship tipo FISHING, direccion LR
+                break;
+            case 'd':
+                manage_new_ship(2, 0);  // Ship tipo PATROL, direccion LR
+                break;
+            case 'z':
+                manage_new_ship(0, 1);  // NORMAL, direccion RL
+                break;
+            case 'x':
+                manage_new_ship(1, 1);  // FISHING, direccion RL
+                break;
+            case 'c':
+                manage_new_ship(2, 1);  // PATROL, direccion RL
+                break;
+            case 'q':
+                disable_raw_mode();
+                printf("Exiting...\n");
+                pthread_exit(NULL);  // Terminar el hilo
+                break;
+            default:
+                printf("Invalid key: %c\n", input);
+                break;
+        }
+    }
+
+    disable_raw_mode();  // Restaurar la terminal
+    return NULL;
 }
 
 
 
+void* manage_keys() {
 
+    // Crear el hilo para escuchar las teclas
+    if (pthread_create(&key_thread, NULL, listen_for_keys, NULL) != 0) {
+        perror("Failed to create key listener thread");
+    }
 
+    // Esperar a que el hilo de teclas termine
+    pthread_join(key_thread, NULL);
 
+    return NULL;
+
+}
 
 
 
@@ -506,6 +571,11 @@ int main(int argc, char *argv[]) {
                     flow_manager.queue_RL[i].direction, flow_manager.queue_RL[i].speed);
     }
 
+    //
+    serial_setup();
+
+    //
+    manage_keys();
 
     // Alista el canal inicializando los mutexes
     ready_up_canal();
@@ -516,30 +586,6 @@ int main(int argc, char *argv[]) {
     // Cierra el canal
     close_canal();
 
-    
-    /* --------------------------------- Testing simulations --------------------------------- */
-
-    /* main program cycle */
-    while (canal_is_open) {
-
-        /* Send actual state of program*/
-        send_state();
-
-        /* Schedule ships */
-        //schedule();
-
-        /* Make ships flow */
-        // flow();
-
-        /* Check if new ships have been added */
-        manage_new_ships();
-
-        // Solo para testing y que termine el programa mientras
-        if (ship_count > 9)
-            canal_is_open = 0;
-    }
-
-    /* --------------------------------------------------------------------------------------- */
 
     return 0;
 }

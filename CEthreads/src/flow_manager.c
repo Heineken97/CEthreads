@@ -127,14 +127,6 @@ void* manage_canal(void* arg) {
 
             pthread_mutex_unlock(&flow_manager->ship_queues);
 
-            /* Test example, falta implementar */
-            // flow_manager->scheduled_queue_LR[0] = 3;
-            // flow_manager->scheduled_queue_LR[1] = 2;
-            // flow_manager->scheduled_queue_LR[2] = 1;
-            // flow_manager->scheduled_queue_RL[0] = 6;
-            // flow_manager->scheduled_queue_RL[1] = 4;
-            // flow_manager->scheduled_queue_RL[2] = 5;
-
             /* Configura el next Ship */
 
             // Mutex que protege la variable de next_ship
@@ -555,7 +547,7 @@ void transmit_canal_data(FlowManager* flow_manager, int destination) {
 
         // Sending the InterfaceData struct to update the Ship positions
         printf("\nSending InterfaceData struct...\n");
-        //write(flow_manager->interface_serial_port, &i_serial_data, sizeof(InterfaceData));
+        write(flow_manager->interface_serial_port, &i_serial_data, sizeof(InterfaceData));
 
 
 

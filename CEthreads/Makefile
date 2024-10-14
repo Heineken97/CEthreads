@@ -12,7 +12,7 @@ BIN_DIR = bin
 TARGET = $(BIN_DIR)/scheduling_ships
 
 # Source files (asegúrate de incluir schedulers.c y flow_methods.c aquí)
-SRCS = $(SRC_DIR)/main.c $(SRC_DIR)/CEthreads.c \
+SRCS = $(SRC_DIR)/main.c \
        $(SRC_DIR)/ship.c \
        $(SRC_DIR)/schedulers.c $(SRC_DIR)/flow_manager.c
 

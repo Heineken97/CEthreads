@@ -97,7 +97,7 @@ typedef struct {
     SimpleShip done_LR_ships[MAX_SHIPS];        // Completed ships in LR
     SimpleShip done_RL_ships[MAX_SHIPS];        // Completed ships in RL
     int canal_length;                           // Length of the canal
-    int actual_direction;                       // Current direction
+    int current_direction;                       // Current direction
     FlowMethod method;                          // Flow control method (int)
     SchedulerType scheduler;                    // Scheduling algorithm (int)
 } InterfaceData;
