@@ -33,6 +33,35 @@ void round_robin_scheduler(Ship ships[], int scheduled_ids[]) {
     }
 }
 
+// Function to simulate Round Robin scheduling
+void round_robin_scheduler(Ship ships[], int ship_count, int time_quantum) {
+    int total_time = 0;
+    int completed = 0;
+    float remaining_time[ship_count];
+
+    // Initialize remaining times
+    for (int i = 0; i < ship_count; i++) {
+        remaining_time[i] = ships[i].processing_time;
+    }
+
+    while (completed < ship_count) {
+        for (int i = 0; i < ship_count; i++) {
+            if (remaining_time[i] > 0) {
+                printf("Ship ID: %d, Time: %d\n", ships[i].id, total_time);
+                if (remaining_time[i] <= time_quantum) {
+                    total_time += remaining_time[i];
+                    remaining_time[i] = 0;
+                    completed++;
+                } else {
+                    remaining_time[i] -= time_quantum;
+                    total_time += time_quantum;
+                }
+            }
+        }
+    }
+    printf("Total Time: %d\n", total_time);
+}
+
 // Priority Scheduler
 void priority_scheduler(Ship ships[], int scheduled_ids[]) {
     for (int i = 0; i < 10; i++) {
@@ -55,6 +84,33 @@ void priority_scheduler(Ship ships[], int scheduled_ids[]) {
     //     }
     //     printf("Barco %d ha salido del canal (prioridad).\n", i);
     // }
+}
+
+// Function to sort ships using the Priority algorithm
+void priority_scheduler(Ship ships[], int ship_count) {
+    // Sort ships based on priority (higher value has higher priority)
+    for (int i = 0; i < ship_count - 1; i++) {
+        for (int j = i + 1; j < ship_count; j++) {
+            if (ships[i].priority < ships[j].priority) {
+                Ship temp = ships[i];
+                ships[i] = ships[j];
+                ships[j] = temp;
+            }
+        }
+    }
+    printf("Ships sorted by Priority:\n");
+    for (int i = 0; i < ship_count; i++) {
+        printf("Ship ID: %d, Priority: %d\n", ships[i].id, ships[i].priority);
+    }
+
+    // Simulate Priority scheduling
+    float total_time = 0;
+    printf("Priority scheduler:\n");
+    for (int i = 0; i < ship_count; i++) {
+        printf("Ship ID: %d, Time: %.2f\n", ships[i].id, total_time);
+        total_time += ships[i].processing_time;
+    }
+    printf("Total Time: %.2f\n", total_time);
 }
 
 // Shortest Job First (SJF) Scheduler
@@ -81,6 +137,39 @@ void sjf_scheduler(Ship ships[], int scheduled_ids[]) {
     // }
 }
 
+// Function to simulate Shortest Job First (SJF) scheduling
+void sjf_scheduler(Ship ships[], int ship_count) {
+    printf("Before sorting:\n");
+    for (int i = 0; i < ship_count; i++) {
+        printf("Ship ID: %d, Processing Time: %.2f\n", ships[i].id, ships[i].processing_time);
+    }
+
+    // Sort ships based on processing time (shorter jobs first)
+    for (int i = 0; i < ship_count - 1; i++) {
+        for (int j = i + 1; j < ship_count; j++) {
+            if (ships[i].processing_time > ships[j].processing_time) {
+                Ship temp = ships[i];
+                ships[i] = ships[j];
+                ships[j] = temp;
+            }
+        }
+    }
+
+    printf("After sorting:\n");
+    for (int i = 0; i < ship_count; i++) {
+        printf("Ship ID: %d, Processing Time: %.2f\n", ships[i].id, ships[i].processing_time);
+    }
+
+    // Simulate SJF scheduling
+    float total_time = 0;
+    printf("SJF scheduler:\n");
+    for (int i = 0; i < ship_count; i++) {
+        printf("Ship ID: %d, Time: %.2f\n", ships[i].id, total_time);
+        total_time += ships[i].processing_time;
+    }
+    printf("Total Time: %.2f\n", total_time);
+}
+
 // First-Come-First-Served (FCFS) Scheduler
 void fcfs_scheduler(Ship ships[], int scheduled_ids[]) {
     for (int i = 0; i < MAX_SHIPS; i++) {
@@ -93,6 +182,17 @@ void fcfs_scheduler(Ship ships[], int scheduled_ids[]) {
         // ships[i].thread.state = THREAD_TERMINATED; // Marcar el barco como terminado
         // printf("Barco %d ha salido del canal (FCFS).\n", i);
     }
+}
+
+// Function to simulate First Come First Serve (FCFS) scheduling
+void fcfs_scheduler(Ship ships[], int ship_count) {
+    float total_time = 0;
+    printf("FCFS scheduler:\n");
+    for (int i = 0; i < ship_count; i++) {
+        printf("Ship ID: %d, Time: %.2f\n", ships[i].id, total_time);
+        total_time += ships[i].processing_time;
+    }
+    printf("Total Time: %.2f\n", total_time);
 }
 
 // Real-Time Scheduler (RTS)
@@ -118,6 +218,17 @@ void real_time_scheduler(Ship ships[], int scheduled_ids[], float max_time) {
     //     ships[i].thread.state = THREAD_TERMINATED; // Marcar el barco como terminado
     //     printf("Barco %d ha salido del canal (RTS).\n", i);
     // }
+}
+
+// Function to simulate Real Time scheduler
+void real_time_scheduler(Ship ships[], int ship_count, float time_slice) {
+    printf("Real Time scheduler:\n");
+    float total_time = 0;
+    for (int i = 0; i < ship_count; i++) {
+        printf("Ship ID: %d, Time: %.2f\n", ships[i].id, time_slice);
+        total_time += time_slice;
+    }
+    printf("Total Time: %.2f\n", total_time);
 }
 
 
@@ -248,3 +359,4 @@ void schedule(SchedulerType scheduler_type,
             exit(EXIT_FAILURE);
     }
 }
+

@@ -5,8 +5,11 @@
 #ifndef SHIPS_H
 #define SHIPS_H
 
+ 
 // #include "CEthreads.h"
+// #include "../include/CEthreads.h"
 #include <pthread.h>
+
 
 // Enumerate ship types
 typedef enum {
@@ -14,6 +17,7 @@ typedef enum {
     FISHING,
     PATROL
 } ShipType;
+
 
 // Structure that represents a ship
 typedef struct {
@@ -24,8 +28,9 @@ typedef struct {
     int priority;           // Priority level (for scheduling algorithms)
     int position;           // Position in channel
     int is_done;            // If Ship completed its journey
-    // CEthread thread; // Hilo asociado al barco
+    // CEthread thread;     // Hilo asociado al barco
     pthread_t thread;       // Hilo asociado al barco
+    float processing_time;  // Processing time for the ship
 } Ship;
 
 // Structure that represents a simplified ship
@@ -33,6 +38,7 @@ typedef struct {
     ShipType type;          // Type of ship (int) [0->NORMAL, 1->FISHING, 2->PATROL]
     int position;           // Position in canal from left to right
 } SimpleShip;
+
 
 // Function to create a new ship
 Ship* create_ship(int id, ShipType type, int direction, double speed);
@@ -47,3 +53,4 @@ void free_ship(Ship* ship);
 void* move_ship(void* arg);
 
 #endif // SHIPS_H
+
