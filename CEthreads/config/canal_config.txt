@@ -1,0 +1,36 @@
+# Configuración del Canal de Tránsito de Barcos
+# --------------------------------------------
+# Este archivo define los parámetros para la simulación del canal y
+# el control de flujo de los barcos.
+
+# Método de control de flujo
+# Opciones: EQUITY, SIGN, TICO
+flow_method: EQUITY
+
+# Largo del canal (en unidades arbitrarias)
+canal_length: 5
+
+# Velocidad de los barcos (en unidades de tiempo)
+normal_speed: 1
+fishing_speed: 2
+patrol_speed: 3
+
+# Lista de barcos (tipo, dirección)
+# --------------------------------
+# Cada barco tiene un tipo y una dirección.
+# Tipo: NORMAL, FISHING, PATROL
+# Dirección: 0 (Izq -> Der), 1 (Der -> Izq)
+ship(NORMAL,0)
+ship(NORMAL,1)
+ship(NORMAL,0)
+ship(NORMAL,1)
+ship(NORMAL,0)
+ship(NORMAL,1)
+
+# Parámetro W para el control de flujo de equidad
+# (cantidad de barcos que cruzan antes de cambiar de dirección)
+w_param: 2
+
+# Tiempo de cambio del letrero
+# (en segundos, solo aplica si se usa el método de control "SIGN")
+t_param: 7.0
