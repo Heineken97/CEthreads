@@ -19,19 +19,19 @@ typedef enum {
 
 // Funciones para los distintos algoritmos de calendarización
 void round_robin_scheduler(Ship ships[], int scheduled_ids[]);
-void round_robin_scheduler(Ship ships[], int ship_count, int time_quantum);
+// void round_robin_scheduler(Ship ships[], int ship_count, int time_quantum);
 
 void priority_scheduler(Ship ships[], int scheduled_ids[]);
-void priority_scheduler(Ship ships[], int ship_count);
+// void priority_scheduler(Ship ships[], int ship_count);
 
 void sjf_scheduler(Ship ships[], int scheduled_ids[]);
-void sjf_scheduler(Ship ships[], int ship_count);
+// void sjf_scheduler(Ship ships[], int ship_count);
 
 void fcfs_scheduler(Ship ships[], int scheduled_ids[]);
-void fcfs_scheduler(Ship ships[], int ship_count);
+// void fcfs_scheduler(Ship ships[], int ship_count);
 
 void real_time_scheduler(Ship ships[], int scheduled_ids[], float max_time);
-void real_time_scheduler(Ship ships[], int ship_count, float max_time);
+// void real_time_scheduler(Ship ships[], int ship_count, float max_time);
 
 
 
@@ -45,4 +45,3 @@ void schedule(SchedulerType scheduler_type,
               Ship ships_RL[], int scheduled_ids_RL[], float max_time);
 
 #endif // SCHEDULERS_H
-
