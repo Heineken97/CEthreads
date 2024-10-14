@@ -1,146 +1,180 @@
 import tkinter as tk
-import tkinter.ttk as ttk
-from collections import deque
-import random
 import struct
 import os
 import time
 import threading
+from collections import deque
 
-barcos = []
-canal_size = 5  # Definir la longitud del canal
+# Define constants for the maximum number of ships and the canal size
+MAX_SHIPS = 5  # Maximum number of ships
+CANAL_SIZE = 5  # Size of the canal
+
+# Define the data format for the pipe
+INTERFACE_DATA_FORMAT = 'ii' * (MAX_SHIPS * 5) + 'iiii'  # 50 integers for the ships and 4 additional integers
 
 class CanalApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Simulación de Canal Marítimo")
 
-        # Frame principal
+        # Create a main frame to hold the UI elements
         main_frame = tk.Frame(self.root)
         main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
 
-        # Puerto A Salida (Cola)
-        self.puerto_A_salida = list(barcos)
-        puerto_A_salida_frame = tk.Frame(main_frame)
-        puerto_A_salida_frame.grid(row=0, column=0, padx=10)  # Mantener grid para alinear bien
-        tk.Label(puerto_A_salida_frame, text="Puerto A Salida").pack()
-        self.puerto_A_frame = tk.Frame(puerto_A_salida_frame)
-        self.puerto_A_frame.pack()
-        self.actualizar_puerto_A()
+        # Initialize the port and canal UI elements
+        self.init_ports(main_frame)
+        self.init_canal(main_frame)
 
-        # Puerto A Entrada (Cola)
+        # Create labels for additional information
+        self.init_labels(main_frame)
+
+        # Initialize the pipe for inter-process communication
+        self.pipe_fd = None
+        self.start_pipe_check()
+
+    def init_ports(self, main_frame):
+        # Create frames for Port A and Port B
+        self.puerto_A_salida = deque()
         self.puerto_A_entrada = deque()
+        self.puerto_B_salida = deque()
+        self.puerto_B_entrada = deque()
+
+        # Create frames for Port A Out, Port A In, Port B Out, and Port B In
+        puerto_A_salida_frame = tk.Frame(main_frame)
+        puerto_A_salida_frame.grid(row=0, column=0, padx=10)
         puerto_A_entrada_frame = tk.Frame(main_frame)
-        puerto_A_entrada_frame.grid(row=1, column=0, padx=10)  # Mantener en la misma columna
+        puerto_A_entrada_frame.grid(row=1, column=0, padx=10)
+        puerto_B_salida_frame = tk.Frame(main_frame)
+        puerto_B_salida_frame.grid(row=0, column=2, padx=10)
+        puerto_B_entrada_frame = tk.Frame(main_frame)
+        puerto_B_entrada_frame.grid(row=1, column=2, padx=10)
+
+        # Create labels for Port A Out, Port A In, Port B Out, and Port B In
+        tk.Label(puerto_A_salida_frame, text="Puerto A Salida").pack()
         tk.Label(puerto_A_entrada_frame, text="Puerto A Entrada").pack()
+        tk.Label(puerto_B_salida_frame, text="Puerto B Salida").pack()
+        tk.Label(puerto_B_entrada_frame, text="Puerto B Entrada").pack()
+
+        # Create frames to hold the boat labels for each port
+        self.puerto_A_salida_frame = tk.Frame(puerto_A_salida_frame)
+        self.puerto_A_salida_frame.pack()
         self.puerto_A_entrada_frame = tk.Frame(puerto_A_entrada_frame)
         self.puerto_A_entrada_frame.pack()
-        self.actualizar_puerto_A_entrada()
+        self.puerto_B_salida_frame = tk.Frame(puerto_B_salida_frame)
+        self.puerto_B_salida_frame.pack()
+        self.puerto_B_entrada_frame = tk.Frame(puerto_B_entrada_frame)
+        self.puerto_B_entrada_frame.pack()
 
-        # Canal (Horizontal con longitud definida)
+        # Initialize the boat labels for each port
+        self.actualizar_puerto_A()
+        self.actualizar_puerto_A_entrada()
+        self.actualizar_puerto_B()
+        self.actualizar_puerto_B_entrada()
+
+    def init_canal(self, main_frame):
+        # Create a frame for the canal
         canal_frame = tk.Frame(main_frame)
-        canal_frame.grid(row=0, column=1, rowspan=2, padx=20)  # Ocupa dos filas para alinearse bien
+        canal_frame.grid(row=0, column=1, rowspan=2, padx=20)
         tk.Label(canal_frame, text="Canal").pack()
-        self.canal = [None] * canal_size  # Crear una lista que representa el canal
+
+        # Create labels for the canal positions
         self.canal_labels = []
-        for i in range(canal_size):
+        for i in range(CANAL_SIZE):
             label = tk.Label(canal_frame, text="Espacio " + str(i + 1), width=10, relief="ridge")
             label.pack(side=tk.LEFT)
             self.canal_labels.append(label)
 
-        # Puerto B Salida (Cola)
-        self.puerto_B_salida =  list(barcos)
-        puerto_B_salida_frame = tk.Frame(main_frame)
-        puerto_B_salida_frame.grid(row=0, column=2, padx=10)  # Alinear en la misma fila que Puerto A
-        tk.Label(puerto_B_salida_frame, text="Puerto B Salida").pack()
-        self.puerto_B_frame = tk.Frame(puerto_B_salida_frame)
-        self.puerto_B_frame.pack()
-        self.actualizar_puerto_B()
+    def init_labels(self, main_frame):
+        # Create labels for additional information
+        self.canal_length_label = tk.Label(main_frame, text="Longitud del canal:")
+        self.canal_length_label.grid(row=2, column=1, padx=10)
+        self.actual_direction_label = tk.Label(main_frame, text="Dirección actual:")
+        self.actual_direction_label.grid(row=3, column=1, padx=10)
+        self.method_label = tk.Label(main_frame, text="Método de flujo:")
+        self.method_label.grid(row=4, column=1, padx=10)
+        self.scheduler_label = tk.Label(main_frame, text="Tipo de programador:")
+        self.scheduler_label.grid(row=5, column=1, padx=10)
+        
 
-        # Puerto B Entrada (Cola)
-        self.puerto_B_entrada = deque()
-        puerto_B_entrada_frame = tk.Frame(main_frame)
-        puerto_B_entrada_frame.grid(row=1, column=2, padx=10)  # Mantener en la misma columna
-        tk.Label(puerto_B_entrada_frame, text="Puerto B Entrada").pack()
-        self.puerto_B_entrada_frame = tk.Frame(puerto_B_entrada_frame)
-        self.puerto_B_entrada_frame.pack()
-        self.actualizar_puerto_B_entrada()
+    def draw_boat(self, label, boat_type, position):
+        # Draw a boat in the label
+        if boat_type == 0:
+            label.config(text=f" ⛴️ ")
+        elif boat_type == 1:
+            label.config(text=f" 🚢 ")
+        elif boat_type == 2:
+            label.config(text=f" 🎣 ")
+        else:
+            label.config(text="")
 
-        # Crear un frame para la tabla de referencias
-        frame_referencias = tk.Frame(main_frame)
-        frame_referencias.grid(row=3, column=1, padx=10, pady=10)
-        # Agregar filas a la tabla
-        for boat_type in ["Normal", "Patrulla", "Pesquero"]:
-            row_frame = tk.Frame(frame_referencias)
-            row_frame.pack(fill=tk.X, padx=10, pady=5)
-            # Agregar el nombre del barco
-            tk.Label(row_frame, text=boat_type).pack(side=tk.LEFT, padx=10)
-            # Agregar la imagen del barco
-            label = tk.Label(row_frame)
-            self.draw_boat(label, boat_type)
-            label.pack(side=tk.LEFT, padx=10)
-        frame_algoritmos = tk.Frame(main_frame)
-        frame_algoritmos.grid(row=4, column=1, padx=10, pady=10)
-
-        # Variable para almacenar el descriptor de archivo del pipe
-        self.pipe_fd = None
-
-        # Iniciar la verificación del pipe en un hilo separado
-        self.start_pipe_check()
-
-    def draw_boat(self, label, boat_type):
-        # Dibujar un barco en la etiqueta
-        if boat_type == "Normal":
-            label.config(text="⛴️")
-        elif boat_type == "Patrulla":
-            label.config(text="🚢")
-        elif boat_type == "Pesquero":
-            label.config(text="🎣")
 
     def actualizar_puerto_A(self):
-        # Actualizar la interfaz gráfica para mostrar los barcos en el puerto A
-        for widget in self.puerto_A_frame.winfo_children():
+        # Update the UI for Port A Out
+        for widget in self.puerto_A_salida_frame.winfo_children():
             widget.destroy()
-        for boat in self.puerto_A_salida:
-            label = tk.Label(self.puerto_A_frame, text="⛴️")
+    
+        # Display the boats that are currently leaving Port A
+        for i in range(MAX_SHIPS):
+            label = tk.Label(self.puerto_A_salida_frame, text="")
             label.pack(side=tk.LEFT, padx=10)
+            if i < len(self.puerto_A_salida):
+                self.draw_boat(label, self.puerto_A_salida[i][0], self.puerto_A_salida[i][1])
+            else:
+                label.config(text="")  # Leave an empty space for departed boats
     
     def actualizar_puerto_A_entrada(self):
-        # Actualizar la interfaz gráfica para mostrar los barcos en la cola de entrada del puerto A
+        # Update the UI for Port A In
         for widget in self.puerto_A_entrada_frame.winfo_children():
             widget.destroy()
-        for boat in self.puerto_A_entrada:
-            label = tk.Label(self.puerto_A_entrada_frame, text="⛴️")
+    
+        # Display the boats that are currently arriving at Port A
+        for i in range(MAX_SHIPS):
+            label = tk.Label(self.puerto_A_entrada_frame, text="")
             label.pack(side=tk.LEFT, padx=10)
+            if i < len(self.puerto_A_entrada):
+                self.draw_boat(label, self.puerto_A_entrada[i][0], self.puerto_A_entrada[i][1])
+            else:
+                label.config(text="")  # Leave an empty space for unoccupied slots
     
     def actualizar_puerto_B(self):
-        # Actualizar la interfaz gráfica para mostrar los barcos en el puerto B
-        for widget in self.puerto_B_frame.winfo_children():
+        # Update the UI for Port B Out
+        for widget in self.puerto_B_salida_frame.winfo_children():
             widget.destroy()
-        for boat in self.puerto_B_salida:
-            label = tk.Label(self.puerto_B_frame, text="🚢")
+    
+        # Display the boats that are currently leaving Port B
+        for i in range(MAX_SHIPS):
+            label = tk.Label(self.puerto_B_salida_frame, text="")
             label.pack(side=tk.LEFT, padx=10)
+            if i < len(self.puerto_B_salida):
+                self.draw_boat(label, self.puerto_B_salida[i][0], self.puerto_B_salida[i][1])
+            else:
+                label.config(text="")  # Leave an empty space for departed boats
     
     def actualizar_puerto_B_entrada(self):
-        # Actualizar la interfaz gráfica para mostrar los barcos en la cola de entrada del puerto B
+        # Update the UI for Port B In
         for widget in self.puerto_B_entrada_frame.winfo_children():
             widget.destroy()
-        for boat in self.puerto_B_entrada:
-            label = tk.Label(self.puerto_B_entrada_frame, text="🚢")
+    
+        # Display the boats that are currently arriving at Port B
+        for i in range(MAX_SHIPS):
+            label = tk.Label(self.puerto_B_entrada_frame, text="")
             label.pack(side=tk.LEFT, padx=10)
-
+            if i < len(self.puerto_B_entrada):
+                self.draw_boat(label, self.puerto_B_entrada[i][0], self.puerto_B_entrada[i][1])
+            else:
+                label.config(text="")  # Leave an empty space for unoccupied slots
     def start_pipe_check(self):
-        # Crear el pipe si no existe
+        # Create the pipe if it doesn't exist
         try:
             os.mkfifo('mock_serial_port')
         except OSError as e:
-            if e.errno != 17:  # Error 17 es "File exists"
+            if e.errno != 17:  # Error 17 is "File exists"
                 raise
 
-        # Abrir el pipe en modo bloqueante
+        # Open the pipe in blocking mode
         self.pipe_fd = os.open('mock_serial_port', os.O_RDONLY)
 
-        # Iniciar el chequeo del pipe en un hilo separado
+        # Start checking the pipe in a separate thread
         threading.Thread(target=self.check_pipe, daemon=True).start()
 
     def check_pipe(self):
@@ -150,80 +184,81 @@ class CanalApp:
 
     def read_from_pipe(self):
         try:
-            # Leer hasta 64 bytes (tamaño de la estructura FlowManager)
-            data = os.read(self.pipe_fd, 64)
+            # Read the exact size of the InterfaceData structure
+            data_size = struct.calcsize(INTERFACE_DATA_FORMAT)
+            data = os.read(self.pipe_fd, data_size)
+
             if len(data) == 0:
-                # No hay datos disponibles, no es un error crítico
+                # No data available, not a critical error
                 return
-            elif len(data) != 64:
+
+            elif len(data) != data_size:
                 print(f"Error: received data size {len(data)} is incorrect")
                 return
 
-            # Desempaquetar los datos recibidos
-            flow_manager = self.unpack_flow_manager(data)
-            # Actualizar la interfaz gráfica con los nuevos datos
-            self.update_gui(flow_manager)
+            # Unpack the received data
+            interface_data = struct.unpack(INTERFACE_DATA_FORMAT, data)
+
+            # Thread-safe UI update
+            self.root.after(0, self.update_gui, interface_data)
 
         except OSError as e:
-            if e.errno != 11:  # Errno 11 es "Resource temporarily unavailable", lo ignoramos
+            if e.errno != 11:  # Errno 11 is "Resource temporarily unavailable", ignore it
                 print(f"Error reading from pipe: {e}")
+
         except struct.error as e:
             print(f"Error unpacking data: {e}")
 
-    def unpack_flow_manager(self, data):
-        # Desempaquetar la estructura FlowManager (15 enteros y 1 flotante)
-        flow_manager = struct.unpack('iiiiiiiiiiiiiiif', data)
-        return {
-            'method': flow_manager[0],
-            'canal_length': flow_manager[1],
-            'current_direction': flow_manager[2],
-            'ships_passed': flow_manager[3],
-            'total_ships_passed': flow_manager[4],
-            'normal_ship_speed': flow_manager[5],
-            'fishing_ship_speed': flow_manager[6],
-            'patrol_ship_speed': flow_manager[7],
-            'ships_in_queue_LR': flow_manager[8],
-            'ships_in_queue_RL': flow_manager[9],
-            'ships_in_midcanal_LR': flow_manager[10],
-            'ships_in_midcanal_RL': flow_manager[11],
-            'ships_in_done_LR': flow_manager[12],
-            'ships_in_done_RL': flow_manager[13],
-            'w_param': flow_manager[14],
-            't_param': flow_manager[15],
-        }
-
-    def update_gui(self, flow_manager):
-        # Actualizar la interfaz gráfica según los datos del FlowManager
-        # Actualizar la cola de entrada del puerto A
-        self.puerto_A_entrada = deque([f"Barco {i+1}" for i in range(flow_manager['ships_in_queue_LR'])])
+    def update_gui(self, interface_data):
+        # Extract the different data components from interface_data tuple
+        queue_LR_data = interface_data[:MAX_SHIPS * 2]
+        queue_RL_data = interface_data[MAX_SHIPS * 2:MAX_SHIPS * 4]
+        midcanal_data = interface_data[MAX_SHIPS * 4:MAX_SHIPS * 6]
+        done_LR_ships = interface_data[MAX_SHIPS * 6:MAX_SHIPS * 8]
+        done_RL_ships = interface_data[MAX_SHIPS * 8:MAX_SHIPS * 10]
+        canal_length = interface_data[MAX_SHIPS * 10]
+        actual_direction = interface_data[MAX_SHIPS * 10 + 1]
+        method = interface_data[MAX_SHIPS * 10 + 2]
+        scheduler = interface_data[MAX_SHIPS * 10 + 3]
+        
+        # Update UI components based on the received data
+        self.canal_length_label.config(text=f"Longitud del canal: {canal_length}")
+        self.actual_direction_label.config(text=f"Dirección actual: {'L->R' if actual_direction == 0 else 'R->L'}")
+        
+        # Map method and scheduler to their corresponding names
+        method_names = {0: "EQUITY", 1: "SIGN", 2: "SIGN"}
+        scheduler_names = {0: "ROUND_ROBIN", 1: "PRIORITY", 2: "SJF", 3: "FCFS", 4: "REAL_TIME"}
+        
+        self.method_label.config(text=f"Método de flujo: {method_names.get(method, 'Unknown')}")
+        self.scheduler_label.config(text=f"Tipo de programador: {scheduler_names.get(scheduler, 'Unknown')}")
+        
+        # Update ports
+        self.puerto_A_salida = deque([(queue_LR_data[i], queue_LR_data[i+1]) for i in range(0, MAX_SHIPS*2, 2)])
+        self.puerto_A_entrada = deque([(done_LR_ships[i], done_LR_ships[i+1]) for i in range(0, MAX_SHIPS*2, 2)])
+        self.puerto_B_salida = deque([(queue_RL_data[i], queue_RL_data[i+1]) for i in range(0, MAX_SHIPS*2, 2)])
+        self.puerto_B_entrada = deque([(done_RL_ships[i], done_RL_ships[i+1]) for i in range(0, MAX_SHIPS*2, 2)])
+        
+        self.actualizar_puerto_A()
         self.actualizar_puerto_A_entrada()
-
-        # Actualizar la cola de entrada del puerto B
-        self.puerto_B_entrada = deque([f"Barco {i+1}" for i in range(flow_manager['ships_in_queue_RL'])])
+        self.actualizar_puerto_B()
         self.actualizar_puerto_B_entrada()
-
-        # Actualizar el canal
-        for i in range(canal_size):
-            if i < flow_manager['ships_in_midcanal_LR']:
-                label = tk.Label(self.canal_labels[i])
-                self.draw_boat(label, "Normal")
-                label.pack()
-            elif i < flow_manager['ships_in_midcanal_LR'] + flow_manager['ships_in_midcanal_RL']:
-                label = tk.Label(self.canal_labels[i])
-                self.draw_boat(label, "Patrulla")
-                label.pack()
+        
+        # Update canal
+        midcanal_ships = []
+        for i in range(0, len(midcanal_data), 2):
+            if 0 < midcanal_data[i+1] < canal_length:  # Only consider ships that are actually in the canal
+                midcanal_ships.append((midcanal_data[i], midcanal_data[i+1]))
+        midcanal_ships.sort(key=lambda x: x[1] if actual_direction == 0 else -x[1])  # Sort ships based on direction
+        
+        for i in range(CANAL_SIZE):
+            if i < len(midcanal_ships):
+                self.draw_boat(self.canal_labels[i], midcanal_ships[i][0], midcanal_ships[i][1])
             else:
                 self.canal_labels[i].config(text="Espacio " + str(i + 1))
-
-        # Actualizar la cola de salida del puerto A
-        self.puerto_A_salida = [f"Barco {i+1}" for i in range(flow_manager['ships_in_done_LR'])]
-        self.actualizar_puerto_A()
-
-        # Actualizar la cola de salida del puerto B
-        self.puerto_B_salida = [f"Barco {i+1}" for i in range(flow_manager['ships_in_done_RL'])]
-        self.actualizar_puerto_B()
+    
 
 if __name__ == "__main__":
     root = tk.Tk()
     app = CanalApp(root)
     root.mainloop()
+
