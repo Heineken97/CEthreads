@@ -54,7 +54,7 @@ uint8_t convertir(boolean arreglo[]) {
 }
 
 // Función para separar los primeros 16 bits en SR1 y SR2
-void separarBits(boolean SR1[8], boolean SR2[8]) {
+void separarBits(boolean SR1[8], boolean SR2[8], boolean SR3[8], boolean SR4[8], boolean SR5[8], boolean SR6[8]) {
     // Separar primeros 8 bits para SR1
     for (int i = 0; i < 8; i++) {
         SR1[i] = leds[i];
@@ -64,13 +64,29 @@ void separarBits(boolean SR1[8], boolean SR2[8]) {
     for (int i = 0; i < 8; i++) {
         SR2[i] = leds[i + 8];
     }
+        // Separar los siguientes 8 bits para SR2
+    for (int i = 0; i < 8; i++) {
+        SR6[i] = leds[i + 8];
+    }
+    // Separar los siguientes 8 bits para SR2
+    for (int i = 0; i < 8; i++) {
+        SR3[i] = leds[i + 8];
+    }
+    // Separar los siguientes 8 bits para SR2
+    for (int i = 0; i < 8; i++) {
+        SR4[i] = leds[i + 8];
+    }
+    // Separar los siguientes 8 bits para SR2
+    for (int i = 0; i < 8; i++) {
+        SR5[i] = leds[i + 8];
+    }
 }
 
 // Función para activar los pines a partir del pin 5
 void activarPins() {
     // Empezar desde el bit 16 en la lista leds
     int pin = 5;
-    for (int i = 16; i < 30; i++) {
+    for (int i = 51; i <= 60; i++) {
         digitalWrite(pin, leds[i] ? HIGH : LOW);
         pin++;
     }
@@ -93,6 +109,9 @@ void setup() {
     pinMode(A2, OUTPUT);
     pinMode(A3, OUTPUT);
     pinMode(A4, OUTPUT);
+    pinMode(A5, OUTPUT);
+    pinMode(A6, OUTPUT);
+    pinMode(A7, OUTPUT);
 }
 
 void loop() {
@@ -113,15 +132,23 @@ void loop() {
 
         crearListaLeds(ships, shipCount);
 
-        // Arreglos para manejar los 2 registros de desplazamiento (16 bits).
+        // Arreglos para manejar los 6 registros de desplazamiento (x bits).
         boolean SR1[8];
         boolean SR2[8];
+        boolean SR3[8];
+        boolean SR4[8];
+        boolean SR5[8];
+        boolean SR6[8];
 
-        separarBits(SR1, SR2);
+        separarBits(SR1, SR2, SR3, SR4, SR5, SR6);
 
         digitalWrite(latch, LOW);  // Comienzo el protocolo de comunicación.
 
-        // Enviar los datos a los dos registros de desplazamiento (16 bits en total).
+        // Enviar los datos a los 6 registros de desplazamiento (x bits en total).
+        shiftOut(data, clockPin, LSBFIRST, convertir(SR5));  // Segundo integrado.
+        shiftOut(data, clockPin, LSBFIRST, convertir(SR4));  // Primer integrado.
+        shiftOut(data, clockPin, LSBFIRST, convertir(SR3));  // Segundo integrado.
+        shiftOut(data, clockPin, LSBFIRST, convertir(SR6));  // Primer integrado.
         shiftOut(data, clockPin, LSBFIRST, convertir(SR2));  // Segundo integrado.
         shiftOut(data, clockPin, LSBFIRST, convertir(SR1));  // Primer integrado.
 
@@ -129,6 +156,5 @@ void loop() {
 
         activarPins();  // Activar los LEDs en los pines directos
 
-        Serial.println("ACK");
     }
 }
