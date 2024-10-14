@@ -15,12 +15,13 @@
 #include <termios.h>
 #include <fcntl.h>
 
-//#include "CEthreads.h"
+#include "CEthreads.h"
+#include "CEmutex.h"
 #include "ship.h"
 #include "schedulers.h"
 #include "flow_manager.h"
 
-#define HW_SERIAL_PORT "/dev/ttyUSB0" // Cambia esto al puerto de tu Arduino
+#define HW_SERIAL_PORT "/dev/ttyUSB0" // puerto Arduino
 #define BAUD_RATE B9600
 #define TIMEOUT 0 // Tiempo de espera en segundos
 
@@ -39,10 +40,12 @@ int ship_count = 0;
 FlowManager flow_manager;
 
 // Crear el hilo para gestionar el canal
-pthread_t canal_thread;
+// pthread_t canal_thread;
+CEthread_t canal_thread;
 
 //
-pthread_t key_thread;
+// pthread_t key_thread;
+CEthread_t key_thread;
 
 /* ---------------------------------------------------------------------------------------- */
 
@@ -234,6 +237,8 @@ void ready_up_canal(){
     // Inicializar los mutexes para cada espacio del canal
     for (int i = 0; i <= flow_manager.canal_length; i++) {
         pthread_mutex_init(&flow_manager.canal_spaces[i], NULL);
+        CEmutex_t mutex;
+        CEmutex_init(&mutex);
         flow_manager.space_state[i] = 0;  // Espacios libres al inicio
     }
 
@@ -324,7 +329,9 @@ void ready_up_ships() {
 void close_canal() {
 
     // Esperar a que el hilo del canal termine
-    pthread_join(canal_thread, NULL);
+    // pthread_join(canal_thread, NULL);
+    void *retval;
+    CEthread_join(canal_thread, &retval);
 
     printf("\nDestroying mutexes on canal spaces...\n");
 
@@ -338,12 +345,6 @@ void close_canal() {
     canal_is_open = 0;
     printf("\nShips are not allowed to flow anymore...\n");
 }
-
-
-
-
-
-
 
 
 
@@ -541,7 +542,10 @@ void* manage_keys() {
     }
 
     // Esperar a que el hilo de teclas termine
-    pthread_join(key_thread, NULL);
+    // pthread_join(key_thread, NULL);
+    void *retval;
+    CEthread_join(key_thread, &retval);
+    
 
     return NULL;
 
