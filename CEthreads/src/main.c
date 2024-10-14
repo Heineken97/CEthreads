@@ -20,6 +20,10 @@
 #include "schedulers.h"
 #include "flow_manager.h"
 
+#define HW_SERIAL_PORT "/dev/ttyUSB0" // Cambia esto al puerto de tu Arduino
+#define BAUD_RATE B9600
+#define TIMEOUT 0 // Tiempo de espera en segundos
+
 
 #define MAX_SHIPS 100
 
@@ -168,25 +172,43 @@ void load_configuration(const char* filename) {
 /*
  * Creates and sets up the serial port
  */
-void serial_setup() {
+int serial_setup() {
 
     // Creates the  serial port
     printf("\nCreates and sets up the serial ports for the first and only time...\n");
 
-    /**/
+    /* Interface Serial Port*/
     flow_manager.interface_serial_port = open("mock_serial_port", O_RDWR);
     if (flow_manager.interface_serial_port == -1) {
         perror("Unable to open mock serial port");
+        return -1;
     }
-    /**/
 
-   /**/
-    //flow_manager.hardware_serial_port = open("mock_serial_port", O_RDWR);
+
+   /* HW Serial Port */
+    flow_manager.hardware_serial_port = open(HW_SERIAL_PORT, O_RDWR | O_NOCTTY | O_NDELAY);
     if (flow_manager.hardware_serial_port == -1) {
         perror("Unable to open mock serial port");
+        return -1;
     }
-    /**/
+    // Se configura el puerto serie aquí
+    configure_serial_port(flow_manager.hardware_serial_port);
+    return flow_manager.hardware_serial_port;
+}
 
+
+void configure_serial_port(int fd) {
+    struct termios options;
+    tcgetattr(fd, &options);
+    cfsetispeed(&options, BAUD_RATE);
+    cfsetospeed(&options, BAUD_RATE);
+    options.c_cflag |= (CLOCAL | CREAD);    // Ignorar líneas de control de módem
+    options.c_cflag &= ~PARENB;              // Sin paridad
+    options.c_cflag &= ~CSTOPB;              // 1 bit de parada
+    options.c_cflag &= ~CSIZE;               // Limpiar la máscara de tamaño actual
+    options.c_cflag |= CS8;                   // 8 bits de datos
+    options.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG); // Entrada sin procesar
+    tcsetattr(fd, TCSANOW, &options);
 }
 
 /*

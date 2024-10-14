@@ -11,6 +11,7 @@
 #include "ship.h"
 #include "schedulers.h"
 
+#define TIMEOUT 0 // Tiempo de espera en segundos
 #define BASE_TIME 1000000
 
 /*
@@ -464,6 +465,8 @@ void transmit_canal_data(FlowManager* flow_manager, int destination) {
     // Sending to interface
     if (destination == 0) {
 
+        /* struct definition */
+
         InterfaceData i_serial_data;
 
         int nShips = 0;
@@ -542,7 +545,7 @@ void transmit_canal_data(FlowManager* flow_manager, int destination) {
         i_serial_data.scheduler = flow_manager->scheduler;
 
 
-
+        /* sending struct */
 
 
         // Sending the InterfaceData struct to update the Ship positions
@@ -555,6 +558,10 @@ void transmit_canal_data(FlowManager* flow_manager, int destination) {
 
     } else if (destination == 1) {
 
+        // Sending the HardwareData struct to update the Ship positions
+        printf("\nSending HardwareData struct...\n");
+
+        /* struct definition */
 
         HardwareData h_serial_data;
 
@@ -563,12 +570,41 @@ void transmit_canal_data(FlowManager* flow_manager, int destination) {
          */
 
 
+        SimpleShip ships[] = {
+            {2, 0}, {0, 0}, {1, 0},
+            {2, 0}, {0, 0}, {1, 0},
+            {2, 0}, {0, 0}, {1, 0},
+            {2, 0}, {0, 0}, {1, 0},
+            {2, 0}, {0, 0}, {1, 0},
+            {2, 0}, {0, 0}, {1, 0},
+            {2, 0}, {0, 0}
+        };
+
+        int count = sizeof(ships) / sizeof(ships[0]);
 
 
-        // Sending the HardwareData struct to update the Ship positions
-        printf("\nSending HardwareData struct...\n");
-        //write(flow_manager->hardware_serial_port, &h_serial_data, sizeof(HardwareData));
+        /* sending struct */
 
+
+        char message[1024] = ""; // Buffer para almacenar el mensaje completo
+
+        // Preparar el mensaje para enviar todos los barcos
+        for (int i = 0; i < count; i++) {
+            char temp[50];
+            snprintf(temp, sizeof(temp), "%d,%d;", ships[i].type, ships[i].position);
+            strcat(message, temp); // Concatenar al mensaje principal
+        }
+
+        // Enviar el mensaje completo
+        write(flow_manager->hardware_serial_port, message, strlen(message));
+        write(flow_manager->hardware_serial_port, "\n", 1); // Enviar carácter de nueva línea
+
+        // Esperar la respuesta del Arduino
+        usleep(TIMEOUT * 1000000); // Dormir por la duración del tiempo de espera
+        char buffer[256];
+        int bytes_read = read(flow_manager->hardware_serial_port, buffer, sizeof(buffer) - 1);
+        buffer[bytes_read] = '\0'; // Null-terminar la cadena
+        printf("Respuesta del Arduino: %s\n", buffer); // Imprimir la respuesta
 
     } 
 
