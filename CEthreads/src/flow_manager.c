@@ -229,6 +229,17 @@ void* manage_canal(void* arg) {
 
                     printf("\n -------- EQUITY Midcycle -------- \n");
 
+                    pthread_mutex_lock(&flow_manager->ship_queues);
+                    
+                    // Transmits data to interface
+                    transmit_canal_data(flow_manager, 0);
+                    // Transmits data to hardware
+                    //transmit_canal_data(flow_manager, 1);
+                    // Prints actual state of data sent
+                    //transmit_canal_data(flow_manager, 2);
+
+                    pthread_mutex_unlock(&flow_manager->ship_queues);
+
                 }
                 // Si ya pasaron los W_PARAM Ships de este ciclo
                 else {
@@ -451,6 +462,132 @@ int get_ships_on_cycle(FlowManager* flow_manager) {
     return total_ships_on_cycle;
 
 }
+
+
+
+
+
+void transmit_canal_data(FlowManager* flow_manager, int destination) {
+
+    // Sending to interface
+    if (destination == 0) {
+
+        InterfaceData i_serial_data;
+
+        int nShips = 0;
+
+        /*
+         * Se agregan las variables al struct InterfaceData
+         */
+
+        // Ships in queue LR scheduled
+        // Iterate over the IDs in the scheduled_queue_LR
+        for (int i = 0; i < MAX_SHIPS; i++) {
+            int current_id = flow_manager->scheduled_queue_LR[i]; // Get the current ID
+
+            // Skip if the ID is less or 0 (empty slot)
+            if (current_id <= 0 && current_id > MAX_SHIPS) {
+                continue;
+            }
+
+            // Search for the current ID in the queue_LR array
+            for (int j = 0; j < MAX_SHIPS; j++) {
+                if (flow_manager->queue_LR[j].id == current_id) {
+                    // If a match is found, save the ship's details in struct
+                    i_serial_data.queue_LR_data[nShips].type = flow_manager->queue_LR[j].type;
+                    i_serial_data.queue_LR_data[nShips].position = flow_manager->queue_LR[j].position;
+                    // Keeps count of Ships in this array
+                    nShips++;
+                    break;  // Exit the inner loop as the ship has been found
+                }
+            }
+        }
+
+        nShips = 0;
+        // Ships in queue RL scheduled
+        for (int i = 0; i < MAX_SHIPS; i++) {
+            int current_id = flow_manager->scheduled_queue_RL[i]; // Get the current ID
+
+            // Skip if the ID is less or 0 (empty slot)
+            if (current_id <= 0 && current_id > MAX_SHIPS) {
+                continue;
+            }
+
+            // Search for the current ID in the queue_RL array
+            for (int j = 0; j < MAX_SHIPS; j++) {
+                if (flow_manager->queue_RL[j].id == current_id) {
+                    // If a match is found, save the ship's details in struct
+                    i_serial_data.queue_RL_data[nShips].type = flow_manager->queue_RL[j].type;
+                    i_serial_data.queue_RL_data[nShips].position = flow_manager->queue_RL[j].position;
+                    // Keeps count of Ships in this array
+                    nShips++;
+                    break;  // Exit the inner loop as the ship has been found
+                }
+            }
+
+        }
+
+        nShips = 0;
+        // Ships in midcanal (current direction only)
+
+
+        // Completed ships in LR
+
+
+        // Completed ships in RL
+
+
+        // Length of the canal
+        i_serial_data.canal_length = flow_manager->canal_length;
+
+        // Current direction
+        i_serial_data.current_direction = flow_manager->current_direction;
+
+        // Flow control method (int)
+        i_serial_data.method = flow_manager->method;
+
+        // Scheduling algorithm (int)
+        i_serial_data.scheduler = flow_manager->scheduler;
+
+
+
+
+
+        // Sending the InterfaceData struct to update the Ship positions
+        printf("\nSending InterfaceData struct...\n");
+        //write(flow_manager->interface_serial_port, &i_serial_data, sizeof(InterfaceData));
+
+
+
+
+
+    } else if (destination == 1) {
+
+
+        HardwareData h_serial_data;
+
+        /*
+         * Se agregan las variables al struct HardwareData
+         */
+
+
+
+
+        // Sending the HardwareData struct to update the Ship positions
+        printf("\nSending HardwareData struct...\n");
+        //write(flow_manager->hardware_serial_port, &h_serial_data, sizeof(HardwareData));
+
+
+    } 
+
+    // Destination error
+    else {
+        printf("TRANSMITTER ERROR @ flow_manager.c (transmit_canal_data): undefined destination\n");
+    }
+
+}
+
+
 
 
 /*

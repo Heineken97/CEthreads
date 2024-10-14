@@ -25,6 +25,11 @@ typedef enum {
 // Structure that represents a flow manager
 typedef struct {
 
+    // 
+    int interface_serial_port;      // Descriptor de archivo para el puerto serial de la interfaz
+    //
+    int hardware_serial_port;       // Descriptor de archivo para el puerto serial del hardware
+    //
     SchedulerType scheduler;        // Calendarizador que ordenara los Ships
     // Initialized in load_configuration(filename) @ main.c
     FlowMethod method;              // Metodo por el cual se regira el programa
@@ -84,6 +89,24 @@ typedef struct {
 
 } FlowManager;
 
+// Structure for interface data (destination 0)
+typedef struct {
+    SimpleShip queue_LR_data[MAX_SHIPS];        // Ships in queue LR scheduled
+    SimpleShip queue_RL_data[MAX_SHIPS];        // Ships in queue RL scheduled
+    SimpleShip midcanal_data[MAX_SHIPS];        // Ships in midcanal (current direction only)
+    SimpleShip done_LR_ships[MAX_SHIPS];        // Completed ships in LR
+    SimpleShip done_RL_ships[MAX_SHIPS];        // Completed ships in RL
+    int canal_length;                           // Length of the canal
+    int actual_direction;                       // Current direction
+    FlowMethod method;                          // Flow control method (int)
+    SchedulerType scheduler;                    // Scheduling algorithm (int)
+} InterfaceData;
+
+// Structure for hardware data (destination 1)
+typedef struct {
+    SimpleShip not_done_data[MAX_SHIPS];        // Queue and midcanal data
+} HardwareData;
+
 // Declaraciones de funciones para cada método de flujo
 void equity_flow(int W);                // Método de flujo: Equidad
 void sign_flow(int change_time);        // Método de flujo: Letrero
@@ -103,6 +126,9 @@ void move_ships_to_done(FlowManager* flow_manager);
 
 // Defines the quantity of ships to complete their journey this cycle
 int get_ships_on_cycle(FlowManager* flow_manager);
+
+//
+void transmit_canal_data(FlowManager* flow_manager, int destination);
 
 // Function that determines if the ship is allowed to advance 
 int ship_can_advance(Ship* ship, FlowManager* flow_manager);

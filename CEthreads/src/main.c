@@ -163,6 +163,30 @@ void load_configuration(const char* filename) {
 }
 
 /*
+ * Creates and sets up the serial port
+ */
+void serial_setup() {
+
+    // Creates the  serial port
+    printf("\nCreates and sets up the serial ports for the first and only time...\n");
+
+    /**/
+    //flow_manager.interface_serial_port = open("mock_serial_port", O_RDWR);
+    if (flow_manager.interface_serial_port == -1) {
+        perror("Unable to open mock serial port");
+    }
+    /**/
+
+   /**/
+    //flow_manager.hardware_serial_port = open("mock_serial_port", O_RDWR);
+    if (flow_manager.hardware_serial_port == -1) {
+        perror("Unable to open mock serial port");
+    }
+    /**/
+
+}
+
+/*
  * Alista el canal
  */
 void ready_up_canal(){

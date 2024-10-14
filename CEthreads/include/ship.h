@@ -28,6 +28,12 @@ typedef struct {
     pthread_t thread;       // Hilo asociado al barco
 } Ship;
 
+// Structure that represents a simplified ship
+typedef struct {
+    ShipType type;          // Type of ship (int) [0->NORMAL, 1->FISHING, 2->PATROL]
+    int position;           // Position in canal from left to right
+} SimpleShip;
+
 // Function to create a new ship
 Ship* create_ship(int id, ShipType type, int direction, double speed);
 
