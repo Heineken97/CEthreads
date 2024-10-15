@@ -6,7 +6,8 @@
 #define FLOW_MANAGER_H
 
 
-// #include "CEthreads.h"
+#include "CEthreads.h"
+#include "CEmutex.h"
 #include <pthread.h>
 #include "ship.h"
 #include "schedulers.h"
@@ -43,6 +44,7 @@ typedef struct {
     int total_ships_passed;         // Barcos que han pasado en total
     // Initialized in ready_up_canal() @ main.c
     pthread_mutex_t canal_spaces[MAX_LENGTH];   // Mutexes para cada espacio del canal
+    //CEmutex_t canal_spaces[MAX_LENGTH];   // Mutexes para cada espacio del canal
     // Initialized in ready_up_canal() @ main.c
     int space_state[MAX_LENGTH];    // Estado de los espacios del canal: 0 = libre, 1 = ocupado
     /* Ship's speeds*/
@@ -58,6 +60,7 @@ typedef struct {
     Ship queue_LR[MAX_SHIPS];       // Array de Ships en cola (Izq -> Der)
     // Initialized in ready_up_canal() @ main.c
     pthread_mutex_t ship_queues;
+    //CEmutex_t ship_queues;
     // Initialized in load_configuration(filename) @ main.c
     int ships_in_queue_RL;          // Cantidad de Ships en queue_RL
     Ship queue_RL[MAX_SHIPS];       // Array de Ships en cola (Der -> Izq)
@@ -73,6 +76,7 @@ typedef struct {
     int queues_changed;             // Dice si han cambiado los queues
     // Initialized in ready_up_canal() @ main.c
     pthread_mutex_t next_ship_mutex;
+    //CEmutex_t next_ship_mutex;
     int next_ship;
     int scheduled_queue_LR[MAX_SHIPS];  // Array con los ids de los Ships ordenados (Izq -> Der)
     int scheduled_queue_RL[MAX_SHIPS];  // Array con los ids de los Ships ordenados (Der -> Izq)

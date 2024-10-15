@@ -227,7 +227,7 @@ void* manage_canal(void* arg) {
                     // Transmits data to interface
                     transmit_canal_data(flow_manager, 0);
                     // Transmits data to hardware
-                    //transmit_canal_data(flow_manager, 1);
+                    // transmit_canal_data(flow_manager, 1);
                     // Prints actual state of data sent
                     //transmit_canal_data(flow_manager, 2);
 
@@ -550,7 +550,7 @@ void transmit_canal_data(FlowManager* flow_manager, int destination) {
 
         // Sending the InterfaceData struct to update the Ship positions
         printf("\nSending InterfaceData struct...\n");
-        write(flow_manager->interface_serial_port, &i_serial_data, sizeof(InterfaceData));
+        //write(flow_manager->interface_serial_port, &i_serial_data, sizeof(InterfaceData));
 
 
 

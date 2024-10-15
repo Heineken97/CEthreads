@@ -8,7 +8,7 @@
 flow_method: EQUITY
 
 # Largo del canal (en unidades arbitrarias)
-canal_length: 5
+canal_length: 2
 
 # Velocidad de los barcos (en unidades de tiempo)
 normal_speed: 1
@@ -20,12 +20,12 @@ patrol_speed: 3
 # Cada barco tiene un tipo y una dirección.
 # Tipo: NORMAL, FISHING, PATROL
 # Dirección: 0 (Izq -> Der), 1 (Der -> Izq)
+ship(PATROL,0)
 ship(NORMAL,0)
+ship(FISHING,0)
+ship(PATROL,1)
 ship(NORMAL,1)
-ship(NORMAL,0)
-ship(NORMAL,1)
-ship(NORMAL,0)
-ship(NORMAL,1)
+ship(FISHING,1)
 
 # Parámetro W para el control de flujo de equidad
 # (cantidad de barcos que cruzan antes de cambiar de dirección)

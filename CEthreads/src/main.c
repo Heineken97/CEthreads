@@ -40,12 +40,12 @@ int ship_count = 0;
 FlowManager flow_manager;
 
 // Crear el hilo para gestionar el canal
-// pthread_t canal_thread;
-CEthread_t canal_thread;
+ pthread_t canal_thread;
+//CEthread_t canal_thread;
 
 //
-// pthread_t key_thread;
-CEthread_t key_thread;
+pthread_t key_thread;
+// CEthread_t key_thread;
 
 /* ---------------------------------------------------------------------------------------- */
 
@@ -175,6 +175,7 @@ void load_configuration(const char* filename) {
 }
 
 int configure_serial_port(int fd) {
+    printf("\nConfiguring serial port...\n");
     struct termios options;
     tcgetattr(fd, &options);
     cfsetispeed(&options, BAUD_RATE);
@@ -200,20 +201,20 @@ int serial_setup() {
     /* Interface Serial Port*/
     flow_manager.interface_serial_port = open("mock_serial_port", O_RDWR);
     if (flow_manager.interface_serial_port == -1) {
-        perror("Unable to open mock serial port");
-        return -1;
+        perror("Unable to open mock serial port: SW");
+        //return -1;
     }
 
 
    /* HW Serial Port */
     flow_manager.hardware_serial_port = open(HW_SERIAL_PORT, O_RDWR | O_NOCTTY | O_NDELAY);
     if (flow_manager.hardware_serial_port == -1) {
-        perror("Unable to open mock serial port");
-        return -1;
+        perror("Unable to open mock serial port: HW");
+        //return -1;
     }
     // Se configura el puerto serie aquí
     configure_serial_port(flow_manager.hardware_serial_port);
-    return flow_manager.hardware_serial_port;
+    // return flow_manager.hardware_serial_port;
 }
 
 
@@ -237,18 +238,19 @@ void ready_up_canal(){
     // Inicializar los mutexes para cada espacio del canal
     for (int i = 0; i <= flow_manager.canal_length; i++) {
         pthread_mutex_init(&flow_manager.canal_spaces[i], NULL);
-        CEmutex_t mutex;
-        CEmutex_init(&mutex);
+        // CEmutex_init(&flow_manager.canal_spaces[i]);
         flow_manager.space_state[i] = 0;  // Espacios libres al inicio
     }
 
     printf("\nInitializaing variables on schedules...\n");
     pthread_mutex_init(&flow_manager.next_ship_mutex, NULL);
+    // CEmutex_init(&flow_manager.next_ship_mutex);
     flow_manager.next_ship = 0;  // Id que iniciará
 
     printf("\nInitializaing variables on flow_manager for flow methods...\n");
 
     pthread_mutex_init(&flow_manager.ship_queues, NULL);
+    // CEmutex_init(&flow_manager.ship_queues);
     // Inicializar el array para saber los ids que van al canal en EQUITY
     // Ningun barco tendrá id 0 
     for (int i = 0; i < MAX_SHIPS; i++) {
@@ -261,6 +263,8 @@ void ready_up_canal(){
 
     // Crea hilo para el flow_manager
     pthread_create(&canal_thread, NULL, manage_canal, &flow_manager);
+    // int tid = CEthread_create(my_start_routine, &mutex);
+    // thread.tid = tid;
 
     usleep(1000000);
 
@@ -329,9 +333,9 @@ void ready_up_ships() {
 void close_canal() {
 
     // Esperar a que el hilo del canal termine
-    // pthread_join(canal_thread, NULL);
-    void *retval;
-    CEthread_join(canal_thread, &retval);
+    pthread_join(canal_thread, NULL);
+    //void *retval;
+    //CEthread_join(canal_thread, &retval);
 
     printf("\nDestroying mutexes on canal spaces...\n");
 
@@ -542,9 +546,9 @@ void* manage_keys() {
     }
 
     // Esperar a que el hilo de teclas termine
-    // pthread_join(key_thread, NULL);
-    void *retval;
-    CEthread_join(key_thread, &retval);
+    pthread_join(key_thread, NULL);
+    //void *retval;
+    //CEthread_join(key_thread, &retval);
     
 
     return NULL;
@@ -601,7 +605,7 @@ int main(int argc, char *argv[]) {
     }
 
     //
-    serial_setup();
+    //serial_setup();
 
     //
     manage_keys();
